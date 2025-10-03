@@ -1,0 +1,244 @@
+---
+alwaysApply: true
+description: "Regras de Multi-Tenancy para ERP Interno Tech"
+---
+
+# 🏢 Multi-Tenancy - ERP Interno Tech
+
+## Regras Fundamentais
+
+### 1. **Isolamento Rigoroso**
+- **TODAS** as operações devem incluir `empresaId`
+- **TODAS** as queries devem filtrar por tenant
+- **TODAS** as APIs devem retornar `tenantId` no meta
+- **NUNCA** expor dados de outras empresas
+
+### 2. **Validação de Tenant**
+```typescript
+// Middleware obrigatório
+export const tenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const empresaId = req.headers['x-empresa-id'] || req.user?.empresaId;
+  
+  if (!empresaId) {
+    return res.status(400).json({ error: 'empresaId é obrigatório' });
+  }
+  
+  req.empresaId = empresaId;
+  next();
+};
+```
+
+### 3. **Filtros Automáticos**
+```typescript
+// Exemplo de query com filtro automático
+const projetos = await prisma.projeto.findMany({
+  where: {
+    empresaId: req.empresaId, // SEMPRE incluir
+    // outros filtros...
+  }
+});
+```
+
+### 4. **Resposta Padronizada**
+```json
+{
+  "data": { /* dados da resposta */ },
+  "meta": {
+    "tenantId": "empresa-123",
+    "requestId": "req-456",
+    "timestamp": "2025-01-03T17:14:25Z",
+    "version": "1.0.0"
+  }
+}
+```
+
+## Regras de Segurança
+
+### 5. **Validação de Acesso**
+- Usuário deve pertencer à empresa
+- Cliente deve pertencer à empresa
+- Projeto deve pertencer à empresa
+- Documento deve pertencer à empresa
+
+### 6. **Auditoria por Tenant**
+```typescript
+// Logs devem incluir tenantId
+logger.info('projeto_criado', {
+  projetoId: projeto.id,
+  empresaId: req.empresaId, // OBRIGATÓRIO
+  usuarioId: req.user.id,
+  timestamp: new Date().toISOString()
+});
+```
+
+### 7. **Cache por Tenant**
+```typescript
+// Cache deve ser isolado por tenant
+const cacheKey = `empresa:${empresaId}:projetos:${projetoId}`;
+const cached = await redis.get(cacheKey);
+```
+
+## Regras de Performance
+
+### 8. **Índices por Tenant**
+```sql
+-- Índices devem incluir empresaId
+CREATE INDEX idx_projetos_empresa_status ON projetos(empresaId, status);
+CREATE INDEX idx_documentos_empresa_projeto ON documentos(empresaId, projetoId);
+```
+
+### 9. **Paginação por Tenant**
+```typescript
+// Paginação deve considerar apenas dados do tenant
+const projetos = await prisma.projeto.findMany({
+  where: { empresaId: req.empresaId },
+  skip: (page - 1) * limit,
+  take: limit,
+  orderBy: { createdAt: 'desc' }
+});
+```
+
+### 10. **Métricas por Tenant**
+```typescript
+// Métricas devem ser separadas por tenant
+metrics.recordRequest({
+  tenantId: req.empresaId,
+  endpoint: req.path,
+  method: req.method,
+  duration: Date.now() - startTime
+});
+```
+
+## Regras de Integração
+
+### 11. **APIs Externas**
+- Headers devem incluir `X-Tenant-ID`
+- Webhooks devem validar tenant
+- Integrações devem ser isoladas
+
+### 12. **Storage por Tenant**
+```typescript
+// Arquivos devem ser organizados por tenant
+const filePath = `empresas/${empresaId}/projetos/${projetoId}/${fileName}`;
+await supabase.storage.from('documents').upload(filePath, file);
+```
+
+### 13. **Notificações por Tenant**
+```typescript
+// Notificações devem ser filtradas por tenant
+const notificacoes = await prisma.notificacao.findMany({
+  where: {
+    empresaId: req.empresaId,
+    usuarioId: req.user.id
+  }
+});
+```
+
+## Regras de Agentes IA
+
+### 14. **Contexto por Tenant**
+- Agentes devem receber apenas dados do tenant
+- Prompts devem incluir contexto de tenant
+- Logs de agentes devem incluir tenantId
+
+### 15. **Permissões por Agente**
+```typescript
+// Agentes devem validar tenant antes de executar
+const agenteAuditor = new AgenteAuditor(empresaId);
+const relatorio = await agenteAuditor.analisarConsistencia();
+```
+
+### 16. **Embeddings por Tenant**
+```typescript
+// Embeddings devem ser isolados por tenant
+const embedding = await generateEmbedding(documento.conteudo, empresaId);
+await supabase.from('documento_embeddings').insert({
+  documentoId: documento.id,
+  empresaId: empresaId,
+  embedding: embedding
+});
+```
+
+## Regras de Monitoramento
+
+### 17. **Logs Estruturados**
+```typescript
+// Todos os logs devem incluir tenantId
+const logEntry = {
+  level: 'info',
+  message: 'Operação executada',
+  tenantId: req.empresaId,
+  userId: req.user?.id,
+  operation: 'projeto_criado',
+  timestamp: new Date().toISOString()
+};
+```
+
+### 18. **Métricas Separadas**
+- Dashboard por tenant
+- Alertas por tenant
+- Relatórios por tenant
+
+### 19. **Auditoria Completa**
+```typescript
+// Auditoria deve rastrear todas as operações por tenant
+await prisma.auditoria.create({
+  data: {
+    empresaId: req.empresaId,
+    usuarioId: req.user.id,
+    operacao: 'projeto_criado',
+    dados: JSON.stringify(dados),
+    timestamp: new Date()
+  }
+});
+```
+
+## Regras de Desenvolvimento
+
+### 20. **Testes Multi-Tenant**
+```typescript
+// Testes devem validar isolamento
+describe('Multi-tenant', () => {
+  it('deve isolar dados entre empresas', async () => {
+    const empresa1 = await criarEmpresa('Empresa 1');
+    const empresa2 = await criarEmpresa('Empresa 2');
+    
+    const projeto1 = await criarProjeto(empresa1.id);
+    const projeto2 = await criarProjeto(empresa2.id);
+    
+    // Empresa 1 não deve ver projeto da empresa 2
+    const projetosEmpresa1 = await listarProjetos(empresa1.id);
+    expect(projetosEmpresa1).not.toContain(projeto2);
+  });
+});
+```
+
+### 21. **Validação de Schema**
+```prisma
+// Todos os modelos devem ter empresaId
+model Projeto {
+  id        String   @id @default(cuid())
+  nome      String
+  empresaId String   // OBRIGATÓRIO
+  // outros campos...
+  
+  @@index([empresaId]) // Índice obrigatório
+}
+```
+
+### 22. **Documentação de Tenant**
+- APIs devem documentar parâmetro empresaId
+- Exemplos devem mostrar uso de tenant
+- Testes devem incluir cenários multi-tenant
+
+## Checklist de Validação
+
+### Antes de Deploy
+- [ ] **Todas as queries** filtram por empresaId
+- [ ] **Todas as APIs** retornam tenantId no meta
+- [ ] **Todos os logs** incluem tenantId
+- [ ] **Todos os caches** são isolados por tenant
+- [ ] **Todos os índices** incluem empresaId
+- [ ] **Todos os testes** validam isolamento
+- [ ] **Todos os agentes** respeitam tenant
+- [ ] **Todas as integrações** validam tenant

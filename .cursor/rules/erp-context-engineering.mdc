@@ -1,0 +1,114 @@
+---
+alwaysApply: true
+description: "Regras de Context Engineering para ERP Interno Tech IA-Ready"
+---
+
+# 🤖 Context Engineering - ERP Interno Tech
+
+## Regras Fundamentais para IA
+
+### 1. **Audit Fields Obrigatórios**
+Todos os modelos Prisma DEVEM ter campos de auditoria:
+```prisma
+model BaseModel {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  // ID do usuário que criou
+  updatedBy String?  // ID do usuário que atualizou
+}
+```
+
+### 2. **Multi-Tenancy Rigorosa**
+- **TODAS** as operações devem incluir `empresaId`
+- **TODAS** as APIs devem retornar `tenantId` no meta
+- **TODAS** as queries devem filtrar por tenant
+
+### 3. **JSON Autodocumentado**
+Toda resposta de API deve seguir o padrão:
+```json
+{
+  "data": { /* dados da resposta */ },
+  "meta": {
+    "tenantId": "empresa-123",
+    "requestId": "req-456",
+    "timestamp": "2025-01-03T17:14:25Z",
+    "version": "1.0.0"
+  }
+}
+```
+
+### 4. **Seeds Versionados**
+- Seeds em CSV + Markdown explicativo
+- Versionamento semântico dos seeds
+- Documentação de classificação para IA
+
+### 5. **Fluxos em Mermaid**
+- **TODOS** os fluxos de negócio em diagramas Mermaid
+- Versionamento dos diagramas
+- Integração com documentação de domínio
+
+## Regras de Context Engineering
+
+### 6. **Context Injection**
+- Documentação por domínio em `docs/03-domains/`
+- Prompts modulares em `docs/02-prompts.md`
+- Personas de agentes em `docs/04-agentes.md`
+
+### 7. **Observabilidade IA**
+- Logs de contexto (não apenas erros de código)
+- Métricas de uso de prompts
+- Tracking de decisões de agentes
+
+### 8. **Versionamento de Contexto**
+- Changelog de mudanças de contexto
+- Versionamento de prompts
+- Histórico de decisões de arquitetura
+
+## Regras de Segurança IA
+
+### 9. **Validação de Contexto**
+- Validação de prompts antes de execução
+- Sanitização de inputs de agentes
+- Auditoria de ações de IA
+
+### 10. **Controle de Acesso**
+- Agentes têm escopo limitado por domínio
+- Validação de permissões por persona
+- Logs de acesso por agente
+
+## Regras de Performance
+
+### 11. **Otimização de Contexto**
+- Carregamento lazy de contexto por domínio
+- Cache de prompts frequentes
+- Compressão de contexto para agentes
+
+### 12. **Métricas de Contexto**
+- Tempo de carregamento de contexto
+- Taxa de sucesso de prompts
+- Qualidade de respostas de agentes
+
+## Regras de Manutenibilidade
+
+### 13. **Documentação Viva**
+- Atualização automática de contexto
+- Sincronização com código
+- Validação de consistência
+
+### 14. **Testes de Contexto**
+- Testes de prompts
+- Validação de respostas de agentes
+- Testes de integração de contexto
+
+## Regras de Escalabilidade
+
+### 15. **Modularidade**
+- Contexto por domínio independente
+- Prompts reutilizáveis
+- Agentes especializados
+
+### 16. **Extensibilidade**
+- Fácil adição de novos domínios
+- Plugins de contexto
+- APIs de contexto para terceiros

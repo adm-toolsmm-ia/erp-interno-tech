@@ -1,0 +1,357 @@
+---
+description: "Biblioteca de Prompts para ERP Interno Tech"
+globs: *.ts,*.tsx,*.js,*.jsx
+---
+
+# 🤖 Biblioteca de Prompts - ERP Interno Tech
+
+## Prompts CRUD Padronizados
+
+### 1. **Prompt CRUD Completo**
+```
+Gere API CRUD completa em Next.js + Prisma para o modelo {MODELO}:
+
+REQUISITOS:
+- Endpoint: /api/{modelo}
+- Métodos: GET, POST, PUT, DELETE
+- Multi-tenant: filtrar por empresaId
+- Validação: usar Zod schemas
+- Auditoria: incluir createdBy/updatedBy
+- Resposta: JSON autodocumentado com meta
+
+MODELO PRISMA:
+{SCHEMA_MODELO}
+
+EXEMPLO DE RESPOSTA:
+{
+  "data": { /* dados */ },
+  "meta": {
+    "tenantId": "empresa-123",
+    "requestId": "req-456",
+    "timestamp": "2025-01-03T17:14:25Z"
+  }
+}
+```
+
+### 2. **Prompt de Validação**
+```
+Crie schema Zod para validação do modelo {MODELO}:
+
+REQUISITOS:
+- Validação de campos obrigatórios
+- Validação de tipos de dados
+- Validação de regras de negócio
+- Mensagens de erro em português
+- Sanitização de inputs
+
+CAMPOS DO MODELO:
+{CAMPOS_MODELO}
+
+REGRAS DE NEGÓCIO:
+{REGRAS_NEGOCIO}
+```
+
+### 3. **Prompt de Testes**
+```
+Gere testes unitários e de integração para {FUNCIONALIDADE}:
+
+REQUISITOS:
+- Testes com Jest + Testing Library
+- Cobertura mínima de 80%
+- Testes de cenários de sucesso e erro
+- Testes de validação multi-tenant
+- Mocks de dependências externas
+
+FUNCIONALIDADE:
+{DESCRICAO_FUNCIONALIDADE}
+
+CENÁRIOS:
+- Sucesso: {CENARIO_SUCESSO}
+- Erro: {CENARIO_ERRO}
+- Validação: {CENARIO_VALIDACAO}
+```
+
+## Prompts de Domínio Específico
+
+### 4. **Prompt Gestão de Projetos**
+```
+Implemente funcionalidade de gestão de projetos:
+
+CONTEXTO:
+- Modelo: Projeto (id, nome, descricao, status, empresaId, clienteId)
+- Status: RASCUNHO, ATIVO, PAUSADO, CONCLUIDO, CANCELADO
+- Relacionamentos: Cliente, Documentos, Orcamentos
+
+FUNCIONALIDADES:
+- Listar projetos por status
+- Filtrar por cliente
+- Calcular progresso
+- Gerar relatórios
+- Notificações de prazo
+
+REGRAS:
+- Apenas usuários da empresa podem ver projetos
+- Clientes externos veem apenas seus projetos
+- Auditoria de todas as mudanças
+```
+
+### 5. **Prompt Gestão de Documentos**
+```
+Implemente sistema de versionamento de documentos:
+
+CONTEXTO:
+- Modelo: Documento (id, nome, versao, conteudo, projetoId, empresaId)
+- Versionamento: automático com histórico
+- Embeddings: para busca semântica
+- Storage: Supabase Storage
+
+FUNCIONALIDADES:
+- Upload de documentos
+- Versionamento automático
+- Busca semântica
+- Download de versões
+- Comparação de versões
+
+REGRAS:
+- Apenas usuários autorizados podem acessar
+- Histórico completo de mudanças
+- Backup automático
+```
+
+### 6. **Prompt Gestão de Orçamentos**
+```
+Implemente sistema de orçamentos e custos:
+
+CONTEXTO:
+- Modelo: Orcamento (id, projetoId, valor, moeda, status, empresaId)
+- Itens: OrcamentoItem (id, orcamentoId, descricao, quantidade, valorUnitario)
+- Status: RASCUNHO, APROVADO, REJEITADO, EXECUTADO
+
+FUNCIONALIDADES:
+- Criação de orçamentos
+- Aprovação de orçamentos
+- Controle de custos
+- Relatórios financeiros
+- Integração com projetos
+
+REGRAS:
+- Apenas gerentes podem aprovar
+- Auditoria de mudanças
+- Cálculos automáticos
+```
+
+## Prompts de Segurança
+
+### 7. **Prompt RBAC**
+```
+Implemente controle de acesso baseado em roles:
+
+CONTEXTO:
+- Roles: ADMIN, GERENTE, USUARIO, CLIENTE_EXTERNO
+- Permissões: por recurso e ação
+- Multi-tenant: isolamento por empresa
+
+FUNCIONALIDADES:
+- Middleware de autenticação
+- Validação de permissões
+- Filtros de dados por role
+- Logs de acesso
+
+REGRAS:
+- ADMIN: acesso total à empresa
+- GERENTE: gestão de projetos e orçamentos
+- USUARIO: visualização e edição limitada
+- CLIENTE_EXTERNO: apenas seus projetos
+```
+
+### 8. **Prompt Validação de Dados**
+```
+Implemente validação robusta de dados:
+
+REQUISITOS:
+- Validação server-side obrigatória
+- Sanitização de inputs
+- Prevenção de SQL injection
+- Validação de tipos
+- Validação de regras de negócio
+
+CAMPOS CRÍTICOS:
+- Emails: formato válido
+- CPF/CNPJ: validação de dígitos
+- Valores: números positivos
+- Datas: formato e lógica
+
+SEGURANÇA:
+- Escape de caracteres especiais
+- Validação de tamanho
+- Prevenção de XSS
+```
+
+## Prompts de Integração
+
+### 9. **Prompt API Externa**
+```
+Implemente integração com API externa:
+
+CONTEXTO:
+- API: {NOME_API}
+- Endpoint: {ENDPOINT}
+- Autenticação: {TIPO_AUTH}
+- Rate limiting: {LIMITE}
+
+FUNCIONALIDADES:
+- Cliente HTTP configurado
+- Tratamento de erros
+- Retry automático
+- Cache de respostas
+- Logs de integração
+
+REGRAS:
+- Timeout configurável
+- Validação de respostas
+- Fallback em caso de erro
+- Monitoramento de performance
+```
+
+### 10. **Prompt Webhook**
+```
+Implemente webhook para notificações:
+
+CONTEXTO:
+- Eventos: {LISTA_EVENTOS}
+- Endpoint: {URL_WEBHOOK}
+- Autenticação: HMAC
+- Retry: exponencial
+
+FUNCIONALIDADES:
+- Envio de notificações
+- Validação de assinatura
+- Retry automático
+- Logs de entrega
+- Status de entrega
+
+REGRAS:
+- Assinatura HMAC obrigatória
+- Timeout de 30s
+- Máximo 3 tentativas
+- Logs de auditoria
+```
+
+## Prompts de Observabilidade
+
+### 11. **Prompt Logging**
+```
+Implemente sistema de logging estruturado:
+
+REQUISITOS:
+- Logs em JSON
+- Níveis: DEBUG, INFO, WARN, ERROR
+- Contexto: tenantId, userId, requestId
+- Sanitização: dados sensíveis mascarados
+
+CAMPOS OBRIGATÓRIOS:
+- timestamp
+- level
+- message
+- tenantId
+- userId
+- requestId
+- service
+- version
+
+SANITIZAÇÃO:
+- Senhas: [REDACTED]
+- Tokens: [REDACTED]
+- CPF/CNPJ: [REDACTED]
+```
+
+### 12. **Prompt Métricas**
+```
+Implemente sistema de métricas:
+
+REQUISITOS:
+- Métricas por tenant
+- Métricas de performance
+- Métricas de negócio
+- Dashboard em tempo real
+
+MÉTRICAS OBRIGATÓRIAS:
+- Requests por minuto
+- Tempo de resposta
+- Taxa de erro
+- Usuários ativos
+- Projetos criados
+- Documentos uploadados
+
+DASHBOARD:
+- Gráficos em tempo real
+- Alertas configuráveis
+- Exportação de dados
+```
+
+## Prompts de IA/ML
+
+### 13. **Prompt Embeddings**
+```
+Implemente sistema de embeddings para documentos:
+
+CONTEXTO:
+- Modelo: text-embedding-ada-002
+- Storage: Supabase
+- Busca: similaridade por cosseno
+
+FUNCIONALIDADES:
+- Geração de embeddings
+- Busca semântica
+- Clustering de documentos
+- Recomendações
+
+REGRAS:
+- Embeddings gerados automaticamente
+- Cache de embeddings
+- Validação de qualidade
+- Monitoramento de performance
+```
+
+### 14. **Prompt Agente Virtual**
+```
+Implemente agente virtual para atendimento:
+
+CONTEXTO:
+- Base de conhecimento: documentos do ERP
+- LLM: GPT-4
+- RAG: embeddings + Supabase
+
+FUNCIONALIDADES:
+- Respostas automáticas
+- Busca em documentos
+- Geração de relatórios
+- Agendamento de reuniões
+
+REGRAS:
+- Apenas dados da empresa
+- Validação de respostas
+- Logs de interações
+- Escalação para humanos
+```
+
+## Uso dos Prompts
+
+### Como usar:
+1. **Copie o prompt** desejado
+2. **Substitua** as variáveis em {MAIUSCULAS}
+3. **Execute** no Cursor/Lovable
+4. **Valide** o resultado
+5. **Documente** melhorias
+
+### Versionamento:
+- Prompts versionados no Git
+- Changelog de mudanças
+- Testes de prompts
+- Feedback da equipe
+
+### Manutenção:
+- Atualização regular
+- Validação de eficácia
+- Otimização baseada em uso
+- Documentação de melhorias

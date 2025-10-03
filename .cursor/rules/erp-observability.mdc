@@ -1,0 +1,416 @@
+---
+description: "Observabilidade e Monitoramento para ERP Interno Tech"
+---
+
+# 📊 Observabilidade - ERP Interno Tech
+
+## Logs Estruturados Obrigatórios
+
+### 1. **Formato JSON Padrão**
+```typescript
+interface StructuredLog {
+  timestamp: string;
+  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+  service: string;
+  version: string;
+  environment: string;
+  tenantId: string;
+  requestId: string;
+  userId?: string;
+  correlationId?: string;
+  sessionId?: string;
+  event: string;
+  message: string;
+  payload: Record<string, any>;
+  metadata: {
+    userAgent?: string;
+    ip?: string;
+    endpoint?: string;
+    method?: string;
+    statusCode?: number;
+    duration?: number;
+    memoryUsage?: NodeJS.MemoryUsage;
+  };
+}
+```
+
+### 2. **Sanitização de Dados Sensíveis**
+```typescript
+const sensitiveKeys = [
+  'password', 'token', 'secret', 'key', 'creditCard', 'ssn', 'cpf',
+  'creditCardNumber', 'cvv', 'pin', 'apiKey', 'privateKey', 'refreshToken'
+];
+
+// Dados sensíveis devem ser mascarados como [REDACTED]
+```
+
+### 3. **Contexto Multi-Tenant**
+```typescript
+// Todos os logs devem incluir tenantId
+logger.info('operacao_executada', {
+  tenantId: req.empresaId,
+  requestId: req.headers['x-request-id'],
+  userId: req.user?.id,
+  operation: 'projeto_criado',
+  payload: { projetoId: projeto.id }
+});
+```
+
+## Métricas por Tenant
+
+### 4. **Métricas de Negócio**
+```typescript
+// Métricas específicas do ERP
+const businessMetrics = {
+  projetos_criados: 'counter',
+  documentos_uploadados: 'counter',
+  orcamentos_aprovados: 'counter',
+  usuarios_ativos: 'gauge',
+  tempo_medio_projeto: 'histogram',
+  taxa_conclusao_projetos: 'gauge'
+};
+```
+
+### 5. **Métricas de Performance**
+```typescript
+// Métricas de performance por tenant
+const performanceMetrics = {
+  request_duration: 'histogram',
+  database_query_time: 'histogram',
+  cache_hit_rate: 'gauge',
+  error_rate: 'gauge',
+  throughput: 'counter'
+};
+```
+
+### 6. **Métricas de Agentes IA**
+```typescript
+// Métricas específicas de agentes
+const agentMetrics = {
+  agente_auditor_execucoes: 'counter',
+  agente_gerente_insights: 'counter',
+  agente_atendimento_respostas: 'counter',
+  tempo_resposta_agente: 'histogram',
+  precisao_agente: 'gauge'
+};
+```
+
+## Tracing Distribuído
+
+### 7. **Spans por Operação**
+```typescript
+// Tracing de operações críticas
+const span = tracer.startSpan('projeto_criado', {
+  attributes: {
+    'tenant.id': empresaId,
+    'user.id': userId,
+    'projeto.nome': projeto.nome
+  }
+});
+
+try {
+  const resultado = await criarProjeto(projeto);
+  span.setStatus({ code: SpanStatusCode.OK });
+  return resultado;
+} catch (error) {
+  span.setStatus({ 
+    code: SpanStatusCode.ERROR, 
+    message: error.message 
+  });
+  span.recordException(error);
+  throw error;
+} finally {
+  span.end();
+}
+```
+
+### 8. **Correlation IDs**
+```typescript
+// Rastreamento de requisições
+const correlationId = req.headers['x-correlation-id'] || uuidv4();
+req.correlationId = correlationId;
+
+// Propagação para operações downstream
+const response = await fetch(url, {
+  headers: {
+    'X-Correlation-ID': correlationId,
+    'X-Tenant-ID': empresaId
+  }
+});
+```
+
+## Health Checks
+
+### 9. **Health Checks por Serviço**
+```typescript
+// Health check completo
+export const healthCheck = async (req: Request, res: Response) => {
+  const checks = {
+    database: await checkDatabase(),
+    redis: await checkRedis(),
+    supabase: await checkSupabase(),
+    storage: await checkStorage()
+  };
+
+  const isHealthy = Object.values(checks).every(check => check.status === 'healthy');
+  
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'healthy' : 'unhealthy',
+    checks,
+    timestamp: new Date().toISOString(),
+    version: process.env.SERVICE_VERSION
+  });
+};
+```
+
+### 10. **Health Checks por Tenant**
+```typescript
+// Health check específico por tenant
+export const tenantHealthCheck = async (req: Request, res: Response) => {
+  const empresaId = req.empresaId;
+  
+  const checks = {
+    tenant_data: await checkTenantData(empresaId),
+    tenant_permissions: await checkTenantPermissions(empresaId),
+    tenant_quotas: await checkTenantQuotas(empresaId)
+  };
+
+  res.json({
+    tenantId: empresaId,
+    status: Object.values(checks).every(c => c.healthy) ? 'healthy' : 'unhealthy',
+    checks,
+    timestamp: new Date().toISOString()
+  });
+};
+```
+
+## Alertas Inteligentes
+
+### 11. **Alertas por Tenant**
+```yaml
+# Configuração de alertas
+alerts:
+  - name: "High Error Rate per Tenant"
+    condition: "rate(errors_total[5m]) by (tenant_id) > 0.1"
+    duration: "2m"
+    severity: "critical"
+    
+  - name: "Slow Response Time per Tenant"
+    condition: "histogram_quantile(0.95, rate(request_duration_seconds_bucket[5m])) by (tenant_id) > 2"
+    duration: "5m"
+    severity: "warning"
+    
+  - name: "Low Memory per Tenant"
+    condition: "memory_usage_percent by (tenant_id) > 90"
+    duration: "5m"
+    severity: "warning"
+```
+
+### 12. **Alertas de Negócio**
+```yaml
+# Alertas específicos do ERP
+business_alerts:
+  - name: "Projetos Atrasados"
+    condition: "projetos_atrasados by (tenant_id) > 5"
+    duration: "1h"
+    severity: "warning"
+    
+  - name: "Orçamentos Estourados"
+    condition: "orcamentos_estourados by (tenant_id) > 0"
+    duration: "0m"
+    severity: "critical"
+    
+  - name: "Documentos em Falta"
+    condition: "documentos_obrigatorios_faltando by (tenant_id) > 3"
+    duration: "2h"
+    severity: "warning"
+```
+
+## Dashboard Grafana
+
+### 13. **Dashboard Multi-Tenant**
+```json
+{
+  "dashboard": {
+    "title": "ERP Interno Tech - Multi-Tenant",
+    "panels": [
+      {
+        "title": "Requests por Tenant",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(requests_total[5m]) by (tenant_id)",
+            "legendFormat": "{{tenant_id}}"
+          }
+        ]
+      },
+      {
+        "title": "Projetos Criados por Tenant",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(projetos_criados[1h]) by (tenant_id)",
+            "legendFormat": "{{tenant_id}}"
+          }
+        ]
+      },
+      {
+        "title": "Performance de Agentes IA",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(agente_execucoes[5m]) by (agente_type, tenant_id)",
+            "legendFormat": "{{agente_type}} - {{tenant_id}}"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 14. **Dashboard por Tenant**
+```json
+{
+  "dashboard": {
+    "title": "ERP - Tenant {{tenant_id}}",
+    "panels": [
+      {
+        "title": "Métricas de Negócio",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "projetos_ativos{tenant_id=\"{{tenant_id}}\"}",
+            "legendFormat": "Projetos Ativos"
+          }
+        ]
+      },
+      {
+        "title": "Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, request_duration_seconds_bucket{tenant_id=\"{{tenant_id}}\"})",
+            "legendFormat": "P95 Response Time"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Monitoramento de Agentes IA
+
+### 15. **Métricas de Agentes**
+```typescript
+// Métricas específicas para cada agente
+export class AgentMetrics {
+  static recordExecution(agentType: string, tenantId: string, duration: number, success: boolean) {
+    metrics.agentExecutions.inc({ agent_type: agentType, tenant_id: tenantId, success: success.toString() });
+    metrics.agentDuration.observe({ agent_type: agentType, tenant_id: tenantId }, duration);
+  }
+  
+  static recordAccuracy(agentType: string, tenantId: string, accuracy: number) {
+    metrics.agentAccuracy.set({ agent_type: agentType, tenant_id: tenantId }, accuracy);
+  }
+  
+  static recordContextLoad(agentType: string, tenantId: string, contextSize: number, loadTime: number) {
+    metrics.agentContextSize.observe({ agent_type: agentType, tenant_id: tenantId }, contextSize);
+    metrics.agentContextLoadTime.observe({ agent_type: agentType, tenant_id: tenantId }, loadTime);
+  }
+}
+```
+
+### 16. **Logs de Agentes**
+```typescript
+// Logs estruturados para agentes
+export class AgentLogger {
+  static logExecution(agentType: string, tenantId: string, operation: string, result: any) {
+    logger.info('agent_execution', {
+      agent_type: agentType,
+      tenant_id: tenantId,
+      operation,
+      result: this.sanitizeResult(result),
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  static logError(agentType: string, tenantId: string, error: Error, context: any) {
+    logger.error('agent_error', {
+      agent_type: agentType,
+      tenant_id: tenantId,
+      error: {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      },
+      context: this.sanitizeContext(context),
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+```
+
+## Observabilidade de Contexto
+
+### 17. **Métricas de Contexto**
+```typescript
+// Métricas de carregamento de contexto
+export class ContextMetrics {
+  static recordContextLoad(domain: string, tenantId: string, loadTime: number, size: number) {
+    metrics.contextLoadTime.observe({ domain, tenant_id: tenantId }, loadTime);
+    metrics.contextSize.observe({ domain, tenant_id: tenantId }, size);
+  }
+  
+  static recordPromptUsage(promptType: string, tenantId: string, success: boolean, duration: number) {
+    metrics.promptUsage.inc({ prompt_type: promptType, tenant_id: tenantId, success: success.toString() });
+    metrics.promptDuration.observe({ prompt_type: promptType, tenant_id: tenantId }, duration);
+  }
+}
+```
+
+### 18. **Logs de Contexto**
+```typescript
+// Logs de operações de contexto
+export class ContextLogger {
+  static logContextLoad(domain: string, tenantId: string, context: any) {
+    logger.info('context_loaded', {
+      domain,
+      tenant_id: tenantId,
+      context_size: JSON.stringify(context).length,
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  static logPromptExecution(promptType: string, tenantId: string, input: any, output: any) {
+    logger.info('prompt_executed', {
+      prompt_type: promptType,
+      tenant_id: tenantId,
+      input_size: JSON.stringify(input).length,
+      output_size: JSON.stringify(output).length,
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+```
+
+## Checklist de Observabilidade
+
+### Configuração Inicial
+- [ ] **Logs estruturados** implementados
+- [ ] **Métricas por tenant** configuradas
+- [ ] **Tracing distribuído** ativo
+- [ ] **Health checks** funcionando
+
+### Monitoramento Ativo
+- [ ] **Dashboard Grafana** configurado
+- [ ] **Alertas** configurados e testados
+- [ ] **Métricas de agentes** implementadas
+- [ ] **Logs de contexto** ativos
+
+### Manutenção
+- [ ] **Retenção de logs** configurada
+- [ ] **Backup de métricas** implementado
+- [ ] **Rotação de logs** ativa
+- [ ] **Limpeza de dados** automatizada

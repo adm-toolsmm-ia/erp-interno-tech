@@ -1,0 +1,260 @@
+---
+description: "Contexto de Domínios do ERP Interno Tech"
+globs: *.ts,*.tsx,*.js,*.jsx
+---
+
+# 🎯 Domínio: Projeto - ERP Interno Tech
+
+## Visão Geral
+
+O domínio de Projeto é o núcleo do ERP, gerenciando todo o ciclo de vida dos projetos desde a criação até a conclusão.
+
+## Modelo de Dados
+
+### **Schema Prisma**
+```prisma
+model Projeto {
+  id          String   @id @default(cuid())
+  nome        String
+  descricao   String?
+  status      StatusProjeto
+  dataInicio  DateTime
+  dataFim     DateTime?
+  orcamento   Decimal?
+  empresaId   String
+  clienteId   String?
+  
+  // Relacionamentos
+  cliente     Cliente?     @relation(fields: [clienteId], references: [id])
+  documentos  Documento[]
+  orcamentos  Orcamento[]
+  tarefas     Tarefa[]
+  
+  // Auditoria
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  
+  @@map("projetos")
+}
+
+enum StatusProjeto {
+  RASCUNHO
+  ATIVO
+  PAUSADO
+  CONCLUIDO
+  CANCELADO
+}
+```
+
+## Regras de Negócio
+
+### **1. Criação de Projetos**
+- ✅ Apenas usuários da empresa podem criar
+- ✅ Nome é obrigatório e único por empresa
+- ✅ Data de início não pode ser no passado
+- ✅ Cliente deve existir e pertencer à empresa
+
+### **2. Status de Projetos**
+- ✅ **RASCUNHO**: Projeto em criação, pode ser editado livremente
+- ✅ **ATIVO**: Projeto em execução, mudanças controladas
+- ✅ **PAUSADO**: Projeto temporariamente parado
+- ✅ **CONCLUIDO**: Projeto finalizado, apenas leitura
+- ✅ **CANCELADO**: Projeto cancelado, apenas leitura
+
+### **3. Transições de Status**
+```mermaid
+stateDiagram-v2
+    [*] --> RASCUNHO
+    RASCUNHO --> ATIVO : Ativar
+    RASCUNHO --> CANCELADO : Cancelar
+    ATIVO --> PAUSADO : Pausar
+    ATIVO --> CONCLUIDO : Finalizar
+    ATIVO --> CANCELADO : Cancelar
+    PAUSADO --> ATIVO : Retomar
+    PAUSADO --> CANCELADO : Cancelar
+    CONCLUIDO --> [*]
+    CANCELADO --> [*]
+```
+
+### **4. Validações**
+- ✅ Data de fim deve ser posterior à data de início
+- ✅ Orçamento deve ser positivo
+- ✅ Projeto ativo deve ter pelo menos um orçamento
+- ✅ Projeto concluído deve ter todos os documentos obrigatórios
+
+## APIs
+
+### **Endpoints**
+```
+GET    /api/projetos              # Listar projetos
+POST   /api/projetos              # Criar projeto
+GET    /api/projetos/{id}         # Obter projeto
+PUT    /api/projetos/{id}         # Atualizar projeto
+DELETE /api/projetos/{id}         # Deletar projeto
+POST   /api/projetos/{id}/status  # Alterar status
+```
+
+### **Filtros**
+- `status`: Filtrar por status
+- `clienteId`: Filtrar por cliente
+- `dataInicio`: Filtrar por data de início
+- `dataFim`: Filtrar por data de fim
+- `orcamento`: Filtrar por faixa de orçamento
+
+### **Ordenação**
+- `nome`: Ordenar por nome
+- `dataInicio`: Ordenar por data de início
+- `status`: Ordenar por status
+- `orcamento`: Ordenar por orçamento
+
+## Fluxos de Trabalho
+
+### **1. Criação de Projeto**
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant A as API
+    participant D as Database
+    participant C as Cliente
+    
+    U->>A: POST /api/projetos
+    A->>D: Validar empresaId
+    A->>C: Validar clienteId
+    A->>D: Criar projeto
+    A->>U: Retornar projeto criado
+```
+
+### **2. Ativação de Projeto**
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant A as API
+    participant D as Database
+    participant O as Orçamento
+    
+    U->>A: POST /api/projetos/{id}/status
+    A->>D: Validar projeto
+    A->>O: Verificar orçamento
+    A->>D: Atualizar status
+    A->>U: Retornar projeto atualizado
+```
+
+## Relacionamentos
+
+### **1. Cliente**
+- Um projeto pode ter um cliente
+- Cliente deve pertencer à mesma empresa
+- Cliente pode ter múltiplos projetos
+
+### **2. Documentos**
+- Um projeto pode ter múltiplos documentos
+- Documentos são versionados
+- Documentos herdam permissões do projeto
+
+### **3. Orçamentos**
+- Um projeto pode ter múltiplos orçamentos
+- Apenas um orçamento pode estar ativo
+- Orçamentos são auditados
+
+### **4. Tarefas**
+- Um projeto pode ter múltiplas tarefas
+- Tarefas são organizadas hierarquicamente
+- Tarefas têm status e responsáveis
+
+## Permissões
+
+### **Por Role**
+- **ADMIN**: Acesso total a todos os projetos
+- **GERENTE**: Acesso a projetos da empresa
+- **USUARIO**: Acesso a projetos atribuídos
+- **CLIENTE_EXTERNO**: Acesso apenas aos seus projetos
+
+### **Por Status**
+- **RASCUNHO**: Apenas criador pode editar
+- **ATIVO**: Equipe do projeto pode editar
+- **CONCLUIDO**: Apenas leitura
+- **CANCELADO**: Apenas leitura
+
+## Métricas e KPIs
+
+### **Métricas de Projeto**
+- Tempo médio de execução
+- Orçamento vs. custo real
+- Taxa de conclusão no prazo
+- Satisfação do cliente
+
+### **Métricas de Equipe**
+- Projetos por usuário
+- Produtividade por período
+- Tempo de resposta
+- Qualidade dos entregáveis
+
+## Integrações
+
+### **1. Documentos**
+- Upload automático de documentos
+- Versionamento automático
+- Busca semântica
+
+### **2. Orçamentos**
+- Cálculo automático de custos
+- Alertas de estouro
+- Relatórios financeiros
+
+### **3. Notificações**
+- Mudanças de status
+- Prazos próximos
+- Aprovações pendentes
+
+## Agentes IA
+
+### **Agente Gerente Virtual**
+- Analisa performance de projetos
+- Sugere otimizações
+- Previne riscos
+
+### **Agente Auditor**
+- Verifica consistência
+- Valida regras de negócio
+- Gera relatórios
+
+### **Agente de Atendimento**
+- Responde dúvidas de clientes
+- Gera relatórios de status
+- Agenda reuniões
+
+## Testes
+
+### **Testes Unitários**
+- Validação de campos
+- Regras de negócio
+- Transições de status
+
+### **Testes de Integração**
+- APIs completas
+- Relacionamentos
+- Permissões
+
+### **Testes de Performance**
+- Carga de projetos
+- Consultas complexas
+- Relatórios
+
+## Monitoramento
+
+### **Logs**
+- Criação de projetos
+- Mudanças de status
+- Acessos de usuários
+
+### **Métricas**
+- Projetos criados por dia
+- Tempo médio de execução
+- Taxa de conclusão
+
+### **Alertas**
+- Projetos atrasados
+- Orçamentos estourados
+- Documentos em falta
