@@ -1,0 +1,56 @@
+---
+alwaysApply: true
+description: "Padrões de commit para o ERP Interno Tech"
+globs: *.ts,*.tsx,*.js,*.jsx,*.md,*.json,*.yml,*.yaml
+---
+
+# 📝 ERP Commit Standards
+
+## Convenção Obrigatória
+- **Formato**: Conventional Commits
+- **Prefixo**: [ERP] + tipo + escopo
+- **Contexto**: Sempre incluir contexto do ERP
+
+## Tipos de Commit
+- **feat(ERP/escopo)**: Nova funcionalidade
+- **fix(ERP/escopo)**: Correção de bug
+- **docs(ERP/escopo)**: Documentação
+- **chore(ERP/escopo)**: Tarefas de manutenção
+- **refactor(ERP/escopo)**: Refatoração de código
+- **style(ERP/escopo)**: Formatação, sem mudança de lógica
+- **test(ERP/escopo)**: Testes
+
+## Escopos do ERP
+- **UX**: Interface e experiência do usuário
+- **API**: Endpoints e lógica de negócio
+- **DB**: Banco de dados e migrations
+- **AUTH**: Autenticação e autorização
+- **TENANT**: Multi-tenancy
+- **DOCS**: Documentação
+- **CONFIG**: Configurações e ambiente
+
+## Exemplos Válidos
+```
+feat(ERP/UX): add Kanban view to Projetos module
+fix(ERP/API): correct Prisma seed for Cliente validation
+docs(ERP/DOCS): create UX/UI guidelines documentation
+chore(ERP/CONFIG): update ESLint configuration
+refactor(ERP/DB): optimize Projeto queries with indexes
+style(ERP/UX): format components with Prettier
+test(ERP/API): add unit tests for Orcamento service
+```
+
+## Template de Commit
+```
+[tipo](ERP/[escopo]): [descrição clara e concisa]
+
+[corpo opcional explicando o que e por que]
+[footer opcional com breaking changes ou issues]
+```
+
+## Regras de Qualidade
+- **Descrição**: máximo 50 caracteres
+- **Corpo**: máximo 72 caracteres por linha
+- **Idioma**: português brasileiro
+- **Tempo**: presente do indicativo (adiciona, corrige, atualiza)
+- **Escopo**: sempre específico ao módulo do ERP

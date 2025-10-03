@@ -1,0 +1,121 @@
+---
+alwaysApply: false
+description: "Automação de Git para evitar Vim e padronizar commits"
+---
+
+# 🔧 ERP Git Automation
+
+## Configuração Recomendada
+
+### 1. Configurar Editor do Git
+```bash
+# Para VS Code/Cursor
+git config --global core.editor "code --wait"
+
+# Para Cursor especificamente
+git config --global core.editor "cursor --wait"
+```
+
+### 2. Hook de Commit (Opcional)
+Criar arquivo `.git/hooks/prepare-commit-msg`:
+```bash
+#!/bin/sh
+if [ -z "$2" ]; then
+  echo "❌ Use sempre: git commit -m \"sua mensagem\""
+  echo "💡 Exemplo: git commit -m \"feat(ERP/UX): add Kanban view\""
+  exit 1
+fi
+```
+
+### 3. Aliases Úteis
+```bash
+# Adicionar ao .gitconfig
+[alias]
+    cm = commit -m
+    cam = commit -am
+    st = status
+    co = checkout
+    br = branch
+    unstage = reset HEAD --
+    last = log -1 HEAD
+    visual = !gitk
+```
+
+## Comandos Padronizados
+
+### Commit Rápido
+```bash
+# Para arquivos já staged
+git commit -m "feat(ERP/UX): add component description"
+
+# Para todos os arquivos modificados
+git commit -am "fix(ERP/API): correct validation error"
+```
+
+### Workflow Completo
+```bash
+# 1. Verificar status
+git status
+
+# 2. Adicionar arquivos específicos
+git add src/components/ProjetoKanban.tsx
+
+# 3. Commit com mensagem padronizada
+git commit -m "feat(ERP/UX): add Kanban view to Projetos"
+
+# 4. Push para repositório
+git push origin main
+```
+
+## Validação de Mensagens
+
+### Regex para Validação
+```regex
+^(feat|fix|docs|chore|refactor|style|test)\(ERP\/[A-Z]+\): .{1,50}$
+```
+
+### Exemplos de Validação
+- ✅ `feat(ERP/UX): add Kanban view`
+- ✅ `fix(ERP/API): correct Prisma validation`
+- ❌ `add kanban` (sem prefixo)
+- ❌ `feat: add kanban` (sem escopo ERP)
+- ❌ `feat(ERP/UX): add` (muito curto)
+
+## Integração com Cursor
+
+### Usar @generate para Commit
+```
+@generate commit-message
+Contexto: Adicionei componente Kanban para visualização de projetos
+Tipo: feat
+Escopo: UX
+```
+
+### Resposta Esperada
+```
+feat(ERP/UX): add Kanban component for Projetos visualization
+```
+
+## Troubleshooting
+
+### Problema: Vim abre ao fazer commit
+**Solução**: Configure o editor do Git
+```bash
+git config --global core.editor "code --wait"
+```
+
+### Problema: Hook não funciona
+**Solução**: Dê permissão de execução
+```bash
+chmod +x .git/hooks/prepare-commit-msg
+```
+
+### Problema: Mensagem muito longa
+**Solução**: Use o padrão de 50 caracteres máximo
+```bash
+# ❌ Muito longo
+git commit -m "feat(ERP/UX): add comprehensive Kanban board component with drag and drop functionality"
+
+# ✅ Correto
+git commit -m "feat(ERP/UX): add Kanban board with drag-drop"
+```

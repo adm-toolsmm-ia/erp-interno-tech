@@ -1,0 +1,211 @@
+---
+alwaysApply: false
+description: "Templates de commit para diferentes cenários do ERP"
+---
+
+# 📋 ERP Commit Templates
+
+## Templates por Tipo de Mudança
+
+### 🆕 Nova Funcionalidade
+```bash
+# Template
+feat(ERP/[SCOPE]): add [funcionalidade] to [módulo]
+
+# Exemplos
+feat(ERP/UX): add Kanban view to Projetos module
+feat(ERP/API): add Orcamento CRUD endpoints
+feat(ERP/DB): add Documento versioning system
+feat(ERP/AUTH): add JWT authentication middleware
+```
+
+### 🐛 Correção de Bug
+```bash
+# Template
+fix(ERP/[SCOPE]): correct [problema] in [módulo]
+
+# Exemplos
+fix(ERP/API): correct Prisma validation for Cliente CNPJ
+fix(ERP/UX): correct responsive layout in Projetos list
+fix(ERP/DB): correct foreign key constraint in Orcamento
+fix(ERP/AUTH): correct token expiration handling
+```
+
+### 📚 Documentação
+```bash
+# Template
+docs(ERP/[SCOPE]): [ação] [documento] for [contexto]
+
+# Exemplos
+docs(ERP/DOCS): create UX/UI guidelines documentation
+docs(ERP/API): update Projeto endpoints documentation
+docs(ERP/DB): add Prisma schema migration guide
+docs(ERP/CONFIG): update environment setup instructions
+```
+
+### 🔧 Manutenção
+```bash
+# Template
+chore(ERP/[SCOPE]): [ação] [item] for [propósito]
+
+# Exemplos
+chore(ERP/CONFIG): update ESLint configuration
+chore(ERP/DEPS): upgrade Prisma to latest version
+chore(ERP/CI): add GitHub Actions workflow
+chore(ERP/SCRIPTS): add database seed script
+```
+
+### ♻️ Refatoração
+```bash
+# Template
+refactor(ERP/[SCOPE]): [ação] [código] for [melhoria]
+
+# Exemplos
+refactor(ERP/API): extract validation logic to service
+refactor(ERP/UX): optimize Projeto component performance
+refactor(ERP/DB): normalize Orcamento table structure
+refactor(ERP/AUTH): simplify JWT middleware logic
+```
+
+### 🎨 Formatação
+```bash
+# Template
+style(ERP/[SCOPE]): format [arquivo] with [ferramenta]
+
+# Exemplos
+style(ERP/UX): format components with Prettier
+style(ERP/API): format controllers with ESLint
+style(ERP/DB): format Prisma schema indentation
+style(ERP/CONFIG): format package.json structure
+```
+
+### 🧪 Testes
+```bash
+# Template
+test(ERP/[SCOPE]): add [tipo] tests for [funcionalidade]
+
+# Exemplos
+test(ERP/API): add unit tests for Orcamento service
+test(ERP/UX): add integration tests for Projeto flow
+test(ERP/DB): add migration tests for Cliente schema
+test(ERP/AUTH): add security tests for JWT validation
+```
+
+## Templates por Módulo do ERP
+
+### 🏢 Empresa
+```bash
+feat(ERP/DB): add Empresa model with multi-tenancy
+fix(ERP/API): correct Empresa validation rules
+docs(ERP/DOCS): create Empresa module documentation
+```
+
+### 👥 Cliente
+```bash
+feat(ERP/API): add Cliente CRUD endpoints
+fix(ERP/DB): correct Cliente CNPJ validation
+refactor(ERP/UX): optimize Cliente list performance
+```
+
+### 📋 Projeto
+```bash
+feat(ERP/UX): add Projeto Kanban board view
+fix(ERP/API): correct Projeto status transitions
+test(ERP/API): add Projeto workflow tests
+```
+
+### 📄 Documento
+```bash
+feat(ERP/DB): add Documento versioning system
+fix(ERP/API): correct Documento upload validation
+docs(ERP/DOCS): create Documento management guide
+```
+
+### 💰 Orçamento
+```bash
+feat(ERP/API): add Orcamento calculation logic
+fix(ERP/DB): correct Orcamento decimal precision
+refactor(ERP/UX): improve Orcamento form UX
+```
+
+### 📅 Cronograma
+```bash
+feat(ERP/UX): add Atividade timeline view
+fix(ERP/API): correct Atividade dependency validation
+test(ERP/API): add Atividade workflow tests
+```
+
+## Templates para Cenários Especiais
+
+### 🔄 Multi-tenancy
+```bash
+feat(ERP/TENANT): add empresaId filtering to all queries
+fix(ERP/TENANT): correct tenant isolation in Projeto API
+refactor(ERP/TENANT): optimize tenant context middleware
+```
+
+### 🔐 Autenticação
+```bash
+feat(ERP/AUTH): add JWT authentication system
+fix(ERP/AUTH): correct token refresh logic
+test(ERP/AUTH): add authentication flow tests
+```
+
+### 🎨 UX/UI
+```bash
+feat(ERP/UX): add responsive design to Projetos list
+fix(ERP/UX): correct mobile navigation menu
+style(ERP/UX): apply consistent spacing tokens
+```
+
+### 🗄️ Banco de Dados
+```bash
+feat(ERP/DB): add Prisma migration for Orcamento table
+fix(ERP/DB): correct foreign key constraints
+refactor(ERP/DB): optimize query performance with indexes
+```
+
+## Comandos de Commit Rápido
+
+### Para Arquivos Específicos
+```bash
+# Adicionar e commitar arquivo específico
+git add src/components/ProjetoKanban.tsx
+git commit -m "feat(ERP/UX): add Kanban component for Projetos"
+
+# Adicionar e commitar múltiplos arquivos
+git add src/components/ src/hooks/
+git commit -m "feat(ERP/UX): add Projeto management components"
+```
+
+### Para Todos os Arquivos Modificados
+```bash
+# Commitar todos os arquivos modificados
+git commit -am "fix(ERP/API): correct validation errors"
+
+# Commitar com mensagem detalhada
+git commit -am "feat(ERP/DB): add Documento versioning system
+
+- Add DocumentoVersao model
+- Implement rollback functionality
+- Add version tracking in Documento model"
+```
+
+## Validação de Templates
+
+### Checklist de Validação
+- [ ] Prefixo correto: `feat|fix|docs|chore|refactor|style|test`
+- [ ] Escopo ERP: `(ERP/[SCOPE])`
+- [ ] Descrição clara e concisa
+- [ ] Máximo 50 caracteres na primeira linha
+- [ ] Idioma português brasileiro
+- [ ] Tempo presente do indicativo
+
+### Exemplo de Validação
+```bash
+# ❌ Incorreto
+git commit -m "add kanban"
+
+# ✅ Correto
+git commit -m "feat(ERP/UX): add Kanban view to Projetos"
+```
