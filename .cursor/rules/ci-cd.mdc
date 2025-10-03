@@ -1,0 +1,292 @@
+---
+globs: *.yml,*.yaml,*.json,*.ts,*.js
+description: "Pipelines CI/CD, deploy e monitoramento"
+---
+
+# 🚀 ERP CI/CD Pipeline
+
+## GitHub Actions Obrigatório
+
+### Pipeline Principal
+```yaml
+# .github/workflows/ci-cd.yml
+name: ERP CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Format check
+        run: npm run format:check
+      
+      - name: Security audit
+        run: npm audit --audit-level moderate
+      
+      - name: Run tests
+        run: npm run test:ci
+      
+      - name: Coverage report
+        run: npm run test:coverage
+
+  deploy-preview:
+    needs: quality
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to Preview
+        run: |
+          # Deploy automático para Preview/Homologação
+          npm run deploy:preview
+
+  deploy-production:
+    needs: quality
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to Production
+        run: |
+          # Deploy controlado para Produção
+          npm run deploy:production
+```
+
+## Vercel Configuration
+
+### vercel.json
+```json
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "regions": ["gru1"],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Deploy Strategy
+
+### Ambientes
+```typescript
+// Estratégia de Deploy
+export const DEPLOY_STRATEGY = {
+  // Desenvolvimento: Deploy automático
+  develop: {
+    autoDeploy: true,
+    environment: 'preview',
+    url: 'https://erp-preview.vercel.app',
+    branch: 'develop'
+  },
+  
+  // Produção: Deploy controlado
+  main: {
+    autoDeploy: false,
+    environment: 'production',
+    url: 'https://erp.tech.com',
+    branch: 'main',
+    requiresApproval: true
+  }
+};
+```
+
+## Health Checks
+
+### Endpoint Obrigatório
+```typescript
+// app/api/health/route.ts
+export async function GET() {
+  const health = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.SERVICE_VERSION || '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    checks: {
+      database: await checkDatabase(),
+      redis: await checkRedis(),
+      supabase: await checkSupabase()
+    }
+  };
+  
+  return Response.json(health);
+}
+```
+
+## Monitoramento
+
+### Logs Estruturados
+```typescript
+// SEMPRE usar logs estruturados
+interface LogEntry {
+  level: 'debug' | 'info' | 'warn' | 'error';
+  event: string;
+  empresaId: string;
+  requestId: string;
+  timestamp: string;
+  payload: Record<string, any>;
+}
+
+function log(level: LogEntry['level'], event: string, payload: Record<string, any>, context: { empresaId: string; requestId: string }) {
+  console.log(JSON.stringify({
+    level,
+    event,
+    empresaId: context.empresaId,
+    requestId: context.requestId,
+    timestamp: new Date().toISOString(),
+    payload
+  }));
+}
+```
+
+### Métricas Básicas
+```typescript
+// Métricas obrigatórias
+export const METRICS = {
+  // Performance
+  response_time: 'API response time in ms',
+  throughput: 'Requests per second',
+  error_rate: 'Error percentage',
+  
+  // Business
+  projetos_criados: 'Total projects created',
+  orcamentos_aprovados: 'Total approved budgets',
+  documentos_uploaded: 'Total documents uploaded',
+  
+  // Infrastructure
+  cpu_usage: 'CPU utilization percentage',
+  memory_usage: 'Memory utilization percentage',
+  disk_usage: 'Disk utilization percentage'
+};
+```
+
+## Branch Protection
+
+### Configuração Obrigatória
+```yaml
+# .github/branch-protection.yml
+name: Configure Branch Protection
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Protect main branch
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.updateBranchProtection({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main',
+              required_status_checks: {
+                strict: true,
+                contexts: [
+                  'Type Check',
+                  'Lint',
+                  'Tests',
+                  'Security Audit',
+                  'Coverage'
+                ]
+              },
+              enforce_admins: true,
+              required_pull_request_reviews: {
+                required_approving_review_count: 2,
+                dismiss_stale_reviews: true,
+                require_code_owner_reviews: true
+              },
+              restrictions: null
+            });
+```
+
+## Scripts Package.json
+
+### CI/CD Scripts
+```json
+{
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "jest",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:coverage": "jest --coverage --watchAll=false",
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix",
+    "build": "next build",
+    "start": "next start",
+    "deploy:preview": "vercel --target preview",
+    "deploy:production": "vercel --target production"
+  }
+}
+```
+
+## Checklist CI/CD
+
+### Pipeline
+- [ ] **GitHub Actions** configurado
+- [ ] **Vercel** configurado
+- [ ] **Branch protection** ativo
+- [ ] **Health checks** funcionando
+
+### Deploy
+- [ ] **Preview** automático em develop
+- [ ] **Produção** controlado em main
+- [ ] **Rollback** testado
+- [ ] **Monitoramento** ativo
+
+### Qualidade
+- [ ] **Lint** obrigatório
+- [ ] **Type check** obrigatório
+- [ ] **Testes** obrigatórios
+- [ ] **Security audit** obrigatório

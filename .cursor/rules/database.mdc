@@ -1,27 +1,28 @@
 ---
 globs: *.prisma,*.ts,*.sql
-description: "Padrões de banco de dados e Prisma para o ERP"
+description: "Padrões de banco de dados, Prisma e seeds"
 ---
 
-# 🗄️ ERP Database Standards — ERPInternoTech
+# 🗄️ ERP Database Standards
 
-## Regras de Schema Prisma
+## Schema Prisma Obrigatório
 
-### Campos Obrigatórios em TODOS os Modelos
+### Modelo Base
 ```prisma
+// SEMPRE incluir em todos os modelos
 model BaseModel {
   id        String    @id @default(cuid())
   empresaId String    // OBRIGATÓRIO - Multi-tenancy
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // OBRIGATÓRIO - Soft delete
-  deletedById String? // Auditoria de exclusão
+  deletedById String? // Auditoria
 }
 ```
 
-### Índices Compostos Obrigatórios
+### Índices Compostos
 ```prisma
-// Sempre incluir empresaId nos índices
+// SEMPRE incluir empresaId nos índices
 @@index([empresaId, status])
 @@index([empresaId, createdAt])
 @@index([empresaId, deletedAt])
@@ -30,7 +31,6 @@ model BaseModel {
 
 ### Relacionamentos Multi-Tenant
 ```prisma
-// Sempre validar empresaId em relacionamentos
 model Projeto {
   empresaId String
   empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
@@ -38,14 +38,14 @@ model Projeto {
   clienteId String
   cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
   
-  // Sempre incluir empresaId em relacionamentos
+  // SEMPRE incluir empresaId em relacionamentos
   @@index([empresaId, clienteId])
 }
 ```
 
-## Seeds Versionados Obrigatórios
+## Seeds Versionados
 
-### Estrutura de Seeds
+### Estrutura Obrigatória
 ```typescript
 // prisma/seed.ts
 export const seedVersion = "1.0.0";
@@ -85,15 +85,52 @@ export const seedData = {
 - Status seguem workflow: Prospecção → Em andamento → Concluído
 ```
 
-## Migrations Obrigatórias
+## Queries Prisma Padrão
 
-### Estrutura de Migration
+### Multi-Tenancy
+```typescript
+// SEMPRE incluir empresaId
+const projetos = await prisma.projeto.findMany({
+  where: {
+    empresaId: req.empresaId, // OBRIGATÓRIO
+    deletedAt: null, // OBRIGATÓRIO
+    // outros filtros...
+  },
+  include: {
+    cliente: true,
+    status: true
+  }
+});
+```
+
+### Soft Delete
+```typescript
+// SEMPRE filtrar deletedAt
+const clientes = await prisma.cliente.findMany({
+  where: {
+    empresaId: req.empresaId,
+    deletedAt: null // OBRIGATÓRIO
+  }
+});
+
+// Soft delete update
+const cliente = await prisma.cliente.update({
+  where: { id: clienteId },
+  data: {
+    deletedAt: new Date(),
+    deletedById: req.userId
+  }
+});
+```
+
+## Migrations
+
+### Estrutura Obrigatória
 ```sql
--- Sempre incluir empresaId
--- Sempre incluir soft delete
--- Sempre incluir índices compostos
+-- SEMPRE incluir empresaId
+-- SEMPRE incluir soft delete
+-- SEMPRE incluir índices compostos
 
--- Exemplo: Create Projetos table
 CREATE TABLE "projetos" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "empresaId" TEXT NOT NULL,
@@ -110,55 +147,12 @@ CREATE TABLE "projetos" (
 -- Índices compostos obrigatórios
 CREATE INDEX "projetos_empresa_status_idx" ON "projetos"("empresaId", "statusId");
 CREATE INDEX "projetos_empresa_cliente_idx" ON "projetos"("empresaId", "clienteId");
-CREATE INDEX "projetos_empresa_data_idx" ON "projetos"("empresaId", "dataEntrada");
 CREATE INDEX "projetos_deleted_at_idx" ON "projetos"("deletedAt");
-```
-
-## Queries Prisma Padrão
-
-### Query com Multi-Tenancy
-```typescript
-// SEMPRE incluir empresaId
-const projetos = await prisma.projeto.findMany({
-  where: {
-    empresaId: req.empresaId, // OBRIGATÓRIO
-    deletedAt: null, // OBRIGATÓRIO
-    // outros filtros...
-  },
-  include: {
-    cliente: true,
-    status: true
-  }
-});
-```
-
-### Query com Soft Delete
-```typescript
-// SEMPRE filtrar deletedAt
-const clientes = await prisma.cliente.findMany({
-  where: {
-    empresaId: req.empresaId,
-    deletedAt: null, // OBRIGATÓRIO
-    // outros filtros...
-  }
-});
-```
-
-### Soft Delete Update
-```typescript
-// SEMPRE usar soft delete
-const cliente = await prisma.cliente.update({
-  where: { id: clienteId },
-  data: {
-    deletedAt: new Date(),
-    deletedById: req.userId
-  }
-});
 ```
 
 ## Backup e Export
 
-### Plano de Backup Mínimo
+### Plano de Backup
 ```typescript
 // scripts/backup.ts
 export async function createBackup(empresaId: string) {
@@ -177,14 +171,22 @@ export async function createBackup(empresaId: string) {
 }
 ```
 
-## Validações de Schema
+## Checklist Database
 
-### Checklist Obrigatório
+### Schema
 - [ ] **empresaId** em todos os modelos
 - [ ] **deletedAt** em todos os modelos
 - [ ] **Índices compostos** com empresaId
 - [ ] **Relacionamentos** validam tenant
-- [ ] **Seeds versionados** documentados
-- [ ] **Migrations** incluem índices
-- [ ] **Soft delete** implementado
+
+### Seeds
+- [ ] **Versionados** e documentados
+- [ ] **Classificação** para IA
+- [ ] **Dados** consistentes
 - [ ] **Backup** configurado
+
+### Queries
+- [ ] **Multi-tenancy** aplicada
+- [ ] **Soft delete** aplicado
+- [ ] **Performance** otimizada
+- [ ] **Validações** ativas

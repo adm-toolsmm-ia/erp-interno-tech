@@ -1,0 +1,79 @@
+---
+alwaysApply: true
+description: "Índice consolidado das regras do Cursor para ERP Interno Tech"
+---
+
+# 🎯 ERP Cursor Rules — Índice Consolidado
+
+## Regras Fundamentais (Sempre Aplicadas)
+
+### Arquitetura e Desenvolvimento
+- [Arquitetura MVP](mdc:.cursor/rules/architecture.mdc) - Estrutura base, multi-tenancy, padrões
+- [Database](mdc:.cursor/rules/database.mdc) - Prisma, seeds, migrations
+- [Security](mdc:.cursor/rules/security.mdc) - Validações, auditoria, preparação Fase 2
+- [Development](mdc:.cursor/rules/development.mdc) - Commits, branches, testes
+
+### UX/UI e Componentes
+- [UX/UI Guidelines](mdc:.cursor/rules/erp-ux-consolidated.mdc) - Tokens, layout, responsividade
+- [UI Components](mdc:.cursor/rules/erp-ux-components.mdc) - Glossário de componentes
+- [UX Flows](mdc:.cursor/rules/erp-ux-flows.mdc) - Comportamentos e interações
+
+### CI/CD e Deploy
+- [CI/CD](mdc:.cursor/rules/ci-cd.mdc) - Pipelines, deploy, monitoramento
+
+## Documentação de Negócio
+- [Contexto Completo](mdc:docs/00-contexto.md) - PRD, schema, fluxos
+- [Módulos](mdc:docs/01-modulos.md) - Detalhes por módulo
+- [Segurança](mdc:docs/02-seguranca.md) - Estratégia de auth/RBAC
+- [Observabilidade](mdc:docs/03-observabilidade.md) - Logs, métricas, tracing
+- [Roadmap](mdc:docs/04-roadmap.md) - Evolução técnica
+
+## Princípios Obrigatórios
+
+### 1. Multi-Tenancy
+- **SEMPRE** incluir `empresaId` em operações
+- **SEMPRE** filtrar por tenant
+- **NUNCA** expor dados de outras empresas
+
+### 2. Soft Delete
+- **SEMPRE** usar `deletedAt` em exclusões
+- **SEMPRE** filtrar `deletedAt: null`
+- **NUNCA** deletar permanentemente
+
+### 3. Validação
+- **SEMPRE** validar entrada de dados
+- **SEMPRE** sanitizar inputs
+- **SEMPRE** logar operações críticas
+
+### 4. Testes
+- **SEMPRE** gerar testes unitários
+- **SEMPRE** testar multi-tenancy
+- **SEMPRE** testar validações
+
+## Padrões de Commit
+```
+<tipo>(ERP/<escopo>): <descrição>
+
+Tipos: feat, fix, docs, chore, refactor, style, test
+Escopos: UX, API, DB, AUTH, TENANT, DOCS, CONFIG
+```
+
+## Estrutura de API
+```typescript
+interface ApiResponse<T> {
+  data: T;
+  meta: {
+    tenantId: string;
+    requestId: string;
+    timestamp: string;
+    version: string;
+  };
+}
+```
+
+## Quick Reference
+- **Criar CRUD**: Use [architecture.mdc](mdc:.cursor/rules/architecture.mdc)
+- **Configurar DB**: Use [database.mdc](mdc:.cursor/rules/database.mdc)
+- **Implementar UI**: Use [UX Guidelines](mdc:.cursor/rules/erp-ux-consolidated.mdc)
+- **Configurar Deploy**: Use [ci-cd.mdc](mdc:.cursor/rules/ci-cd.mdc)
+- **Entender Negócio**: Use [docs/00-contexto.md](mdc:docs/00-contexto.md)

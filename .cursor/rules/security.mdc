@@ -1,0 +1,217 @@
+---
+globs: *.ts,*.tsx,*.js,*.jsx
+description: "Regras de segurança mínimas para MVP"
+---
+
+# 🔒 ERP Security MVP
+
+## Validação de Uploads
+
+### MIME Types Permitidos
+```typescript
+// SEMPRE validar tipo MIME
+const allowedMimeTypes = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/png',
+  'image/jpeg'
+];
+
+function validateFileType(file: File): boolean {
+  return allowedMimeTypes.includes(file.type);
+}
+
+// SEMPRE validar tamanho (50MB max)
+function validateFileSize(file: File): boolean {
+  return file.size <= 50 * 1024 * 1024; // 50MB
+}
+```
+
+### Upload Seguro
+```typescript
+export async function secureUpload(file: File, empresaId: string): Promise<string> {
+  // 1. Validar tipo MIME
+  if (!validateFileType(file)) {
+    throw new Error('Tipo de arquivo não permitido');
+  }
+  
+  // 2. Validar tamanho
+  if (!validateFileSize(file)) {
+    throw new Error('Arquivo muito grande');
+  }
+  
+  // 3. Gerar nome seguro
+  const safeName = generateSafeFileName(file.name, empresaId);
+  
+  // 4. Upload para Supabase Storage
+  const { data, error } = await supabase.storage
+    .from(`empresa-${empresaId}`)
+    .upload(safeName, file);
+    
+  if (error) throw error;
+  
+  return data.path;
+}
+```
+
+## Validação de Dados
+
+### Sanitização
+```typescript
+// SEMPRE sanitizar entrada
+function sanitizeInput(input: string): string {
+  return input
+    .replace(/[<>]/g, '') // Remove caracteres perigosos
+    .trim()
+    .substring(0, 1000); // Limita tamanho
+}
+
+// SEMPRE validar com Zod
+import { z } from 'zod';
+
+const CreateProjetoSchema = z.object({
+  empresaId: z.string().cuid(),
+  clienteId: z.string().cuid(),
+  assunto: z.string().min(1).max(255),
+  dataEntrada: z.date()
+});
+```
+
+### Validação de CNPJ
+```typescript
+// SEMPRE validar CNPJ
+export function validateCNPJ(cnpj: string): boolean {
+  const cleanCNPJ = cnpj.replace(/[^\d]/g, '');
+  
+  if (cleanCNPJ.length !== 14) return false;
+  
+  // Validação do algoritmo do CNPJ
+  const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  
+  const digits = cleanCNPJ.split('').map(Number);
+  
+  const sum1 = digits.slice(0, 12).reduce((sum, digit, index) => 
+    sum + digit * weights1[index], 0
+  );
+  const digit1 = sum1 % 11 < 2 ? 0 : 11 - (sum1 % 11);
+  
+  const sum2 = digits.slice(0, 13).reduce((sum, digit, index) => 
+    sum + digit * weights2[index], 0
+  );
+  const digit2 = sum2 % 11 < 2 ? 0 : 11 - (sum2 % 11);
+  
+  return digits[12] === digit1 && digits[13] === digit2;
+}
+```
+
+## Headers de Segurança
+
+### Configuração Obrigatória
+```typescript
+// SEMPRE incluir headers de segurança
+export function setSecurityHeaders(response: Response) {
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+}
+```
+
+## Auditoria Mínima
+
+### Logs de Segurança
+```typescript
+// SEMPRE logar operações críticas
+interface SecurityLog {
+  level: 'security';
+  event: string;
+  empresaId: string;
+  userId?: string;
+  ip?: string;
+  userAgent?: string;
+  details: Record<string, any>;
+  timestamp: string;
+}
+
+function logSecurityEvent(event: string, details: Record<string, any>, request: Request) {
+  const log: SecurityLog = {
+    level: 'security',
+    event,
+    empresaId: request.headers.get('x-empresa-id') || 'unknown',
+    userId: request.headers.get('x-user-id'),
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    userAgent: request.headers.get('user-agent'),
+    details,
+    timestamp: new Date().toISOString()
+  };
+  
+  console.log(JSON.stringify(log));
+}
+```
+
+### Eventos a Logar
+```typescript
+// SEMPRE logar estes eventos
+logSecurityEvent('file_upload', { fileName, size, type }, request);
+logSecurityEvent('data_access', { resource, action, resourceId }, request);
+logSecurityEvent('validation_error', { field, error, value }, request);
+```
+
+## Rate Limiting Básico
+
+### Implementação
+```typescript
+const rateLimit = new Map<string, { count: number; resetTime: number }>();
+
+export function rateLimitCheck(ip: string, limit: number = 100, windowMs: number = 60000): boolean {
+  const now = Date.now();
+  const key = ip;
+  const current = rateLimit.get(key);
+  
+  if (!current || now > current.resetTime) {
+    rateLimit.set(key, { count: 1, resetTime: now + windowMs });
+    return true;
+  }
+  
+  if (current.count >= limit) {
+    return false;
+  }
+  
+  current.count++;
+  return true;
+}
+```
+
+## Preparação para Fase 2
+
+### Estrutura de Auth
+```typescript
+// lib/auth.ts (preparação)
+export interface AuthUser {
+  id: string;
+  email: string;
+  empresaId: string;
+  role: 'admin' | 'user' | 'viewer';
+}
+
+export function validateAuth(request: Request): AuthUser | null {
+  // Implementar na Fase 2
+  return null;
+}
+```
+
+## Checklist de Segurança
+
+### Validações
+- [ ] **Uploads** validados por MIME e tamanho
+- [ ] **Dados** sanitizados antes de salvar
+- [ ] **CNPJ** validado com algoritmo
+- [ ] **Headers** de segurança configurados
+
+### Auditoria
+- [ ] **Logs** de segurança ativos
+- [ ] **Rate limiting** implementado
+- [ ] **Eventos** críticos logados
+- [ ] **Estrutura** preparada para Fase 2

@@ -1,0 +1,211 @@
+---
+alwaysApply: true
+description: "Arquitetura MVP, multi-tenancy e padrões fundamentais"
+globs: *.ts,*.tsx,*.js,*.jsx
+---
+
+# 🏗️ ERP Architecture MVP
+
+## Multi-Tenancy Obrigatória
+
+### Filtros Automáticos
+```typescript
+// SEMPRE filtrar por empresaId
+const projetos = await prisma.projeto.findMany({
+  where: {
+    empresaId: req.empresaId, // OBRIGATÓRIO
+    deletedAt: null, // OBRIGATÓRIO
+    // outros filtros...
+  }
+});
+```
+
+### Validação de Tenant
+```typescript
+// SEMPRE validar tenant em APIs
+export async function GET(request: Request) {
+  const empresaId = request.headers.get('x-empresa-id');
+  
+  if (!empresaId) {
+    return Response.json({ error: 'empresaId required' }, { status: 400 });
+  }
+  
+  // Continuar com lógica...
+}
+```
+
+## Soft Delete Universal
+
+### Modelo Base
+```typescript
+// SEMPRE incluir em todos os modelos
+interface BaseModel {
+  id: string;
+  empresaId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date; // OBRIGATÓRIO
+  deletedById?: string;
+}
+```
+
+### Queries com Soft Delete
+```typescript
+// SEMPRE filtrar deletedAt
+const clientes = await prisma.cliente.findMany({
+  where: {
+    empresaId: req.empresaId,
+    deletedAt: null // OBRIGATÓRIO
+  }
+});
+```
+
+## Estrutura de Resposta API
+
+### Padrão Obrigatório
+```typescript
+interface ApiResponse<T> {
+  data: T;
+  meta: {
+    tenantId: string;
+    requestId: string;
+    timestamp: string;
+    version: string;
+  };
+}
+
+// SEMPRE usar este formato
+export async function GET(request: Request) {
+  const data = await getData();
+  
+  return Response.json({
+    data,
+    meta: {
+      tenantId: req.empresaId,
+      requestId: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      version: "1.0.0"
+    }
+  });
+}
+```
+
+## Endpoints Next.js API Routes
+
+### Estrutura Padrão
+```typescript
+// app/api/[resource]/route.ts
+export async function GET(request: Request) {
+  // 1. Validar tenant
+  // 2. Filtrar por empresaId
+  // 3. Aplicar soft delete
+  // 4. Retornar resposta padronizada
+}
+
+export async function POST(request: Request) {
+  // 1. Validar entrada
+  // 2. Incluir empresaId
+  // 3. Salvar com soft delete
+  // 4. Retornar resposta padronizada
+}
+```
+
+## Observabilidade Mínima
+
+### Health Check
+```typescript
+// app/api/health/route.ts
+export async function GET() {
+  return Response.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+}
+```
+
+### Logs Estruturados
+```typescript
+// SEMPRE usar logs estruturados
+console.log(JSON.stringify({
+  level: 'info',
+  event: 'projeto_created',
+  empresaId: req.empresaId,
+  projetoId: projeto.id,
+  timestamp: new Date().toISOString()
+}));
+```
+
+## Testes Obrigatórios
+
+### Estrutura de Teste
+```typescript
+describe('ProjetoService', () => {
+  it('should filter by empresaId', async () => {
+    const projetos = await projetoService.findAll('empresa-1');
+    expect(projetos.every(p => p.empresaId === 'empresa-1')).toBe(true);
+  });
+  
+  it('should apply soft delete', async () => {
+    await projetoService.delete('projeto-1');
+    const projeto = await projetoService.findById('projeto-1');
+    expect(projeto.deletedAt).toBeDefined();
+  });
+});
+```
+
+## Estrutura de Pastas
+
+### Organização Obrigatória
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── health/
+│   │   ├── empresas/
+│   │   ├── clientes/
+│   │   ├── projetos/
+│   │   └── documentos/
+│   └── (dashboard)/
+├── components/
+│   ├── ui/
+│   ├── forms/
+│   ├── tables/
+│   └── modals/
+├── lib/
+│   ├── prisma.ts
+│   ├── supabase.ts
+│   └── utils.ts
+├── hooks/
+│   ├── use-tenant.ts
+│   └── use-crud.ts
+└── types/
+    ├── api.ts
+    └── database.ts
+```
+
+## Checklist de Arquitetura
+
+### Multi-Tenancy
+- [ ] **empresaId** em todas as operações
+- [ ] **Filtros** automáticos por tenant
+- [ ] **Validação** de tenant em APIs
+- [ ] **Isolamento** de dados garantido
+
+### Soft Delete
+- [ ] **deletedAt** em todos os modelos
+- [ ] **Filtros** deletedAt: null
+- [ ] **Auditoria** de exclusões
+- [ ] **Rollback** possível
+
+### APIs
+- [ ] **Resposta** padronizada
+- [ ] **Meta** com tenantId
+- [ ] **Validação** de entrada
+- [ ] **Logs** estruturados
+
+### Testes
+- [ ] **Multi-tenancy** testado
+- [ ] **Soft delete** testado
+- [ ] **Validações** testadas
+- [ ] **APIs** testadas

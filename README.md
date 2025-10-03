@@ -1,36 +1,165 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏢 ERP Interno Tech
 
-## Getting Started
+ERP interno da empresa Tech em fase de MVP, desenvolvido com Next.js 15, Prisma, Supabase e Tailwind CSS.
 
-First, run the development server:
+## 🚀 Funcionalidades Atuais
+
+- **Multi-tenancy** rigorosa com isolamento de dados
+- **Soft delete** universal em todos os modelos
+- **CRUDs** para empresas, clientes, projetos, documentos e orçamentos
+- **Dashboards** essenciais com métricas de negócio
+- **Documentos** versionados com busca semântica
+- **Orçamentos** com workflow de aprovação
+- **Observabilidade** mínima com health checks
+
+## 🛠️ Tecnologias
+
+- **Frontend**: Next.js 15 (App Router), Tailwind CSS, Shadcn/UI
+- **Backend**: Supabase (PostgreSQL + Storage + Edge Functions)
+- **ORM**: Prisma com multi-tenancy
+- **Deploy**: Vercel (Prod, Preview, Dev)
+- **IA**: Embeddings com pgvector (Fase 2)
+
+## 📚 Documentação
+
+### Contexto e Arquitetura
+- [📄 Contexto Completo](docs/00-contexto.md) - PRD, schema, fluxos
+- [📋 Módulos](docs/01-modulos.md) - Detalhes por módulo
+- [🔒 Segurança](docs/02-seguranca.md) - Estratégia de auth/RBAC
+- [📊 Observabilidade](docs/03-observabilidade.md) - Logs, métricas, tracing
+- [🚀 Roadmap](docs/04-roadmap.md) - Evolução técnica
+
+### Regras do Cursor
+- [🎯 Índice Consolidado](.cursor/rules/_index.mdc) - Regras práticas
+- [💻 Desenvolvimento](.cursor/rules/development.mdc) - Commits, branches, testes
+- [🏗️ Arquitetura](.cursor/rules/architecture.mdc) - Multi-tenancy, padrões
+- [🗄️ Database](.cursor/rules/database.mdc) - Prisma, seeds, migrations
+- [🔒 Segurança](.cursor/rules/security.mdc) - Validações, auditoria
+- [🚀 CI/CD](.cursor/rules/ci-cd.mdc) - Pipelines, deploy, monitoramento
+
+## ⚡ Quick Start
 
 ```bash
+# 1. Clone o repositório
+git clone https://github.com/adm-toolsmm-ia/erp-interno-tech.git
+cd erp-interno-tech
+
+# 2. Instale as dependências
+npm install
+
+# 3. Configure as variáveis de ambiente
+cp .env.example .env.local
+# Edite .env.local com suas credenciais
+
+# 4. Execute as migrations
+npx prisma migrate dev
+
+# 5. Execute o projeto
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🏗️ Estrutura do Projeto
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── api/               # API Routes
+│   │   ├── health/        # Health checks
+│   │   ├── empresas/      # CRUD empresas
+│   │   ├── clientes/      # CRUD clientes
+│   │   ├── projetos/      # CRUD projetos
+│   │   ├── documentos/    # CRUD documentos
+│   │   └── orcamentos/    # CRUD orçamentos
+│   └── (dashboard)/       # Páginas do dashboard
+├── components/            # Componentes React
+│   ├── ui/               # Shadcn/UI components
+│   ├── forms/            # Formulários específicos
+│   ├── tables/           # Tabelas e listas
+│   ├── modals/           # Modais de criação
+│   ├── drawers/          # Drawers de edição
+│   └── dashboards/       # Visões 360º
+├── lib/                  # Utilitários e configurações
+│   ├── prisma.ts         # Cliente Prisma
+│   ├── supabase.ts       # Cliente Supabase
+│   └── utils.ts          # Utilitários gerais
+├── hooks/                # Hooks customizados
+│   ├── use-tenant.ts     # Hook de multi-tenancy
+│   └── use-crud.ts       # Hook de CRUD
+└── types/                # Tipos TypeScript
+    ├── api.ts            # Tipos de API
+    └── database.ts       # Tipos de banco
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🎯 Princípios Fundamentais
 
-## Learn More
+### 1. Multi-Tenancy Rigorosa
+- **TODAS** as operações incluem `empresaId`
+- **TODAS** as queries filtram por tenant
+- **NUNCA** expor dados de outras empresas
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Soft Delete Universal
+- **TODOS** os modelos têm `deletedAt`
+- **TODAS** as queries filtram `deletedAt: null`
+- **NUNCA** deletar dados permanentemente
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. Observabilidade Mínima
+- Endpoint `/api/health` obrigatório
+- Logs estruturados em console
+- Métricas básicas de performance
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 4. Testes Obrigatórios
+- Testes unitários para CRUDs
+- Testes de multi-tenancy
+- Testes de soft delete
+- Testes de validações
 
-## Deploy on Vercel
+## 🚀 Deploy
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Ambientes
+- **Desenvolvimento**: Deploy automático em `develop`
+- **Preview/Homologação**: Deploy automático em PRs
+- **Produção**: Deploy controlado em `main`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Comandos
+```bash
+# Deploy para preview
+npm run deploy:preview
+
+# Deploy para produção
+npm run deploy:production
+```
+
+## 📊 Status do Projeto
+
+### ✅ Concluído
+- [x] Arquitetura base definida
+- [x] Regras do Cursor implementadas
+- [x] Padrões de commit automatizados
+- [x] Documentação completa
+- [x] Estrutura de pastas organizada
+
+### 🚧 Em Desenvolvimento
+- [ ] Schema Prisma completo
+- [ ] APIs de todos os módulos
+- [ ] UI/UX consistente
+- [ ] Testes unitários
+- [ ] Deploy automático
+
+### 📋 Próximos Passos
+- [ ] Implementar CRUDs básicos
+- [ ] Configurar multi-tenancy
+- [ ] Implementar soft delete
+- [ ] Criar dashboards essenciais
+- [ ] Configurar observabilidade
+
+## 🤝 Contribuição
+
+1. Siga os [padrões de commit](.cursor/rules/development.mdc)
+2. Use as [regras do Cursor](.cursor/rules/_index.mdc)
+3. Implemente [testes unitários](.cursor/rules/development.mdc)
+4. Mantenha [multi-tenancy](.cursor/rules/architecture.mdc)
+5. Aplique [soft delete](.cursor/rules/architecture.mdc)
+
+## 📞 Suporte
+
+Para dúvidas ou suporte, consulte a [documentação completa](docs/00-contexto.md) ou entre em contato com a equipe de desenvolvimento.

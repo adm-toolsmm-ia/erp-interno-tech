@@ -1,0 +1,208 @@
+---
+alwaysApply: true
+description: "Padrões de desenvolvimento, commits, branches e testes"
+globs: *.ts,*.tsx,*.js,*.jsx,*.md,*.json
+---
+
+# 💻 ERP Development Standards
+
+## Padrões de Commit Obrigatórios
+
+### Formato
+```
+<tipo>(ERP/<escopo>): <descrição>
+```
+
+### Tipos
+- **feat**: Nova funcionalidade
+- **fix**: Correção de bug
+- **docs**: Documentação
+- **chore**: Tarefas de manutenção
+- **refactor**: Refatoração
+- **style**: Formatação
+- **test**: Testes
+
+### Escopos
+- **UX**: Interface e experiência
+- **API**: Endpoints e lógica
+- **DB**: Banco de dados
+- **AUTH**: Autenticação
+- **TENANT**: Multi-tenancy
+- **DOCS**: Documentação
+- **CONFIG**: Configurações
+
+### Exemplos
+```bash
+feat(ERP/UX): add Kanban view to Projetos
+fix(ERP/API): correct Prisma validation
+docs(ERP/DOCS): create UX guidelines
+chore(ERP/CONFIG): update ESLint rules
+```
+
+## Aliases Git Configurados
+```bash
+git cm "mensagem"     # commit rápido
+git cam "mensagem"    # add + commit
+git st                 # status
+git last               # último commit
+```
+
+## Padrões de Branch
+
+### Nomenclatura
+```
+feature/ERP-123-add-kanban-view
+fix/ERP-456-correct-validation
+hotfix/ERP-789-security-patch
+```
+
+### Workflow
+1. **feature/**: Desenvolvimento de funcionalidades
+2. **fix/**: Correções de bugs
+3. **hotfix/**: Correções urgentes
+4. **main**: Branch principal (produção)
+5. **develop**: Branch de desenvolvimento
+
+## Testes Obrigatórios
+
+### Estrutura
+```typescript
+// tests/[module]/[feature].test.ts
+describe('ProjetoService', () => {
+  describe('createProjeto', () => {
+    it('should create projeto with empresaId', async () => {
+      // Teste multi-tenancy
+    });
+    
+    it('should validate required fields', async () => {
+      // Teste validação
+    });
+    
+    it('should apply soft delete', async () => {
+      // Teste soft delete
+    });
+  });
+});
+```
+
+### Cobertura Mínima
+- **Unitários**: 80% para services
+- **Integração**: 60% para APIs
+- **E2E**: 40% para fluxos críticos
+
+### Comandos
+```bash
+npm run test              # Todos os testes
+npm run test:unit         # Apenas unitários
+npm run test:integration  # Apenas integração
+npm run test:coverage     # Com cobertura
+```
+
+## Estrutura de Arquivos
+
+### Organização por Módulo
+```
+src/
+├── modules/
+│   ├── empresa/
+│   │   ├── components/
+│   │   ├── services/
+│   │   ├── types/
+│   │   └── tests/
+│   ├── cliente/
+│   ├── projeto/
+│   └── documento/
+```
+
+### Padrões de Nomenclatura
+- **Componentes**: PascalCase (`ProjetoKanban.tsx`)
+- **Hooks**: camelCase com `use` (`useProjetos.ts`)
+- **Services**: PascalCase com `Service` (`ProjetoService.ts`)
+- **Types**: PascalCase (`ProjetoTypes.ts`)
+- **Utils**: camelCase (`projetoUtils.ts`)
+
+## Code Quality
+
+### ESLint Rules
+```json
+{
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "prefer-const": "error",
+    "no-var": "error"
+  }
+}
+```
+
+### Prettier Config
+```json
+{
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5"
+}
+```
+
+### TypeScript Strict
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true
+  }
+}
+```
+
+## Scripts Package.json
+
+### Desenvolvimento
+```json
+{
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build --turbopack",
+    "start": "next start",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  }
+}
+```
+
+### Testes
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false"
+  }
+}
+```
+
+## Checklist de Desenvolvimento
+
+### Antes de Commitar
+- [ ] **Lint** passa sem erros
+- [ ] **Type check** sem erros
+- [ ] **Testes** passando
+- [ ] **Mensagem** segue padrão
+- [ ] **Branch** nomeada corretamente
+
+### Antes de Push
+- [ ] **Rebase** com main/develop
+- [ ] **Conflitos** resolvidos
+- [ ] **Testes** atualizados
+- [ ] **Documentação** atualizada
+
+### Antes de Merge
+- [ ] **Code review** aprovado
+- [ ] **CI/CD** passando
+- [ ] **Cobertura** adequada
+- [ ] **Performance** validada
