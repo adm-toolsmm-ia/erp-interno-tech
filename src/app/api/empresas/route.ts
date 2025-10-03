@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     });
 
     const skip = (page - 1) * limit;
-    const orderBy = sortBy ? { [sortBy]: sortOrder } : { createdAt: 'desc' };
+    const orderBy = sortBy ? { [sortBy]: sortOrder } : { createdAt: 'desc' as const };
 
     const [empresas, total] = await Promise.all([
       prisma.empresa.findMany({

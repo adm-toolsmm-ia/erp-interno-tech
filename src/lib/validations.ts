@@ -89,7 +89,7 @@ export const createDocumentoSchema = z.object({
   sizeBytes: z.number().int().positive('Tamanho deve ser positivo'),
   checksum: z.string().optional(),
   storageProvider: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).default([]),
 });
 
@@ -159,6 +159,6 @@ export const documentoFilterSchema = z.object({
 
 // Schema para filtros de orçamento
 export const orcamentoFilterSchema = z.object({
-  status: z.enum(['RASCUNHO', 'ENVIADO', 'APROVADO', 'REJEITADO', 'EXPIRADO']).optional(),
+  orcamentoStatus: z.enum(['RASCUNHO', 'ENVIADO', 'APROVADO', 'REJEITADO', 'EXPIRADO']).optional(),
   ...projetoFilterSchema.shape,
 });

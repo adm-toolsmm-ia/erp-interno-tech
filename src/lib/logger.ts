@@ -1,5 +1,5 @@
 interface LogContext {
-  tenantId: string;
+  empresaId: string;
   requestId: string;
   userId?: string;
   correlationId?: string;

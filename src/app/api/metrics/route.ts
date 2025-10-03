@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Buscar nomes dos status
-    const statusIds = projetosPorStatus.map(p => p.statusId).filter(Boolean);
+    const statusIds = projetosPorStatus.map(p => p.statusId).filter((id): id is string => id !== null);
     const statusProjetos = await prisma.statusProjeto.findMany({
       where: {
         id: { in: statusIds },

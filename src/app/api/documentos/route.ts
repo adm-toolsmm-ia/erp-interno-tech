@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     });
 
     const skip = (page - 1) * limit;
-    const orderBy = sortBy ? { [sortBy]: sortOrder } : { updatedAt: 'desc' };
+    const orderBy = sortBy ? { [sortBy]: sortOrder } : { updatedAt: 'desc' as const };
 
     const whereClause = {
       empresaId: context.empresaId,
@@ -173,7 +173,18 @@ export async function POST(request: NextRequest) {
 
     const documento = await prisma.documento.create({
       data: {
-        ...validatedData,
+        titulo: validatedData.titulo,
+        descricao: validatedData.descricao,
+        storageKey: validatedData.storageKey,
+        contentType: validatedData.contentType,
+        sizeBytes: validatedData.sizeBytes,
+        checksum: validatedData.checksum,
+        storageProvider: validatedData.storageProvider,
+
+        tags: validatedData.tags,
+        projetoId: validatedData.projetoId,
+        clienteId: validatedData.clienteId,
+        categoriaId: validatedData.categoriaId,
         empresaId: context.empresaId,
         createdById: context.userId,
         updatedById: context.userId,
