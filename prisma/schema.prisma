@@ -1,3 +1,6 @@
+// ===========================
+// Datasource & Generator
+// ===========================
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -7,12 +10,525 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ===========================
+// Enums (estáveis)
+// ===========================
+enum OrcamentoStatus {
+  ABERTO
+  APROVADO
+  REJEITADO
+}
 
-  @@map("users")
+enum PrioridadeProjeto {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum StatusOrcamento {
+  RASCUNHO
+  ENVIADO
+  APROVADO
+  REJEITADO
+  EXPIRADO
+}
+
+// ===========================
+// Modelos Centrais
+// ===========================
+model Empresa {
+  id           String  @id @default(uuid())
+  razaoSocial  String
+  nomeFantasia String
+  cnpj         String  @unique
+  endereco     String
+  telefone     String?
+  email        String?
+  website      String?
+  logo         String?
+  timezone     String  @default("America/Sao_Paulo")
+  moeda        String  @default("BRL")
+  formatoData  String  @default("DD/MM/YYYY")
+
+  // Relacionamentos
+  produtos            ProdutoServico[]
+  usuarios            Usuario[]
+  clientes            Cliente[]
+  projetos            Projeto[]
+  fornecedores        Fornecedor[]
+  statusProjetos      StatusProjeto[]
+  categoriasDocumento CategoriaDocumento[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  @@index([cnpj])
+  @@index([deletedAt])
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+
+  nome      String
+  email     String @unique
+  senhaHash String
+  role      String // administrador | vendedor | gerente | clienteExterno
+
+  // Relacionamentos como responsável
+  projetosGerente       Projeto[]              @relation("GerenteProjeto")
+  projetosVendedor      Projeto[]              @relation("VendedorProjeto")
+  setoresCoordenador    SetorCliente[]         @relation("SetorCoordenador")
+  setoresGerente        SetorCliente[]         @relation("SetorGerente")
+  setoresKeyUser        SetorCliente[]         @relation("SetorKeyUser")
+  atividadesResponsavel AtividadeResponsavel[]
+  orcamentosCriados     Orcamento[]            @relation("OrcamentoCreatedBy")
+  orcamentosAtualizados Orcamento[]            @relation("OrcamentoUpdatedBy")
+  atasCriadas           Ata[]                  @relation("AtaCreatedBy")
+  atasAtualizadas       Ata[]                  @relation("AtaUpdatedBy")
+  documentosCriados     Documento[]            @relation("DocumentoCreatedBy")
+  documentosAtualizados Documento[]            @relation("DocumentoUpdatedBy")
+  versoesDocumento      DocumentoVersao[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  @@index([empresaId, role])
+  @@index([deletedAt])
+}
+
+model Cliente {
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  razaoSocial    String
+  nomeFantasia   String?
+  cnpj           String
+  normalizedCnpj String
+  segmento       String?
+
+  // Endereço
+  logradouro  String
+  numero      String
+  complemento String?
+  bairro      String
+  cidade      String
+  estado      String
+  cep         String
+
+  // Contato
+  telefone String?
+  email    String?
+  website  String?
+
+  representantes Representante[]
+  setores        SetorCliente[]
+  documentos     Documento[]
+  projetos       Projeto[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  @@unique([empresaId, cnpj])
+  @@index([empresaId, normalizedCnpj])
+  @@index([empresaId, createdAt])
+  @@index([deletedAt])
+}
+
+model SetorCliente {
+  id        String  @id @default(uuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  nome      String
+
+  coordenadorId String?
+  gerenteId     String?
+  keyUserId     String?
+
+  coordenador Usuario? @relation("SetorCoordenador", fields: [coordenadorId], references: [id])
+  gerente     Usuario? @relation("SetorGerente", fields: [gerenteId], references: [id])
+  keyUser     Usuario? @relation("SetorKeyUser", fields: [keyUserId], references: [id])
+
+  @@index([clienteId, nome])
+}
+
+model Representante {
+  id        String  @id @default(uuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  nome     String
+  email    String?
+  telefone String?
+
+  @@index([clienteId, nome])
+}
+
+model ProdutoServico {
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  nome      String
+  tipo      String // produto | servico
+  categoria String
+  status    String
+
+  projetos ProjetoProduto[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  @@unique([empresaId, nome, tipo])
+  @@index([empresaId, categoria])
+  @@index([empresaId, status])
+  @@index([deletedAt])
+}
+
+model Projeto {
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+
+  assunto     String
+  descricao   String?
+  statusId    String?
+  status      StatusProjeto? @relation(fields: [statusId], references: [id])
+  dataEntrada DateTime
+  dataInicio  DateTime?
+  dataFim     DateTime?
+
+  expectativa   String?
+  objetivo      String?
+  observacoes   String?
+  valorEstimado Decimal?          @db.Decimal(18, 2)
+  prioridade    PrioridadeProjeto @default(MEDIA)
+  tags          String[]
+
+  gerenteId  String?
+  vendedorId String?
+  gerente    Usuario? @relation("GerenteProjeto", fields: [gerenteId], references: [id])
+  vendedor   Usuario? @relation("VendedorProjeto", fields: [vendedorId], references: [id])
+
+  produtos   ProjetoProduto[]
+  documentos Documento[]
+  orcamentos Orcamento[]
+  atividades Atividade[]
+  atas       Ata[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  @@unique([empresaId, assunto, clienteId])
+  @@index([empresaId, clienteId])
+  @@index([empresaId, statusId])
+  @@index([empresaId, dataEntrada])
+  @@index([empresaId, prioridade])
+  @@index([deletedAt])
+}
+
+model ProjetoProduto {
+  id        String @id @default(uuid())
+  empresaId String
+  projetoId String
+  produtoId String
+
+  projeto Projeto        @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+  produto ProdutoServico @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  @@unique([projetoId, produtoId])
+  @@index([empresaId, projetoId])
+}
+
+model Fornecedor {
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  nome     String
+  cnpj     String?
+  email    String?
+  telefone String?
+
+  orcamentos Orcamento[]
+  itens      OrcamentoItem[]
+
+  @@unique([empresaId, nome])
+  @@index([empresaId, cnpj])
+}
+
+model Orcamento {
+  id        String  @id @default(uuid())
+  empresaId String
+  projetoId String
+  projeto   Projeto @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+
+  numero       String
+  titulo       String
+  descricao    String?
+  status       StatusOrcamento @default(RASCUNHO)
+  dataCriacao  DateTime        @default(now())
+  dataValidade DateTime
+  moeda        String          @default("BRL")
+  valorTotal   Decimal         @default(0) @db.Decimal(18, 2)
+  desconto     Decimal?        @db.Decimal(18, 2)
+  valorFinal   Decimal         @default(0) @db.Decimal(18, 2)
+  observacoes  String?
+
+  fornecedorId String?
+  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
+
+  itens OrcamentoItem[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  createdById String?
+  updatedById String?
+  createdBy   Usuario? @relation("OrcamentoCreatedBy", fields: [createdById], references: [id])
+  updatedBy   Usuario? @relation("OrcamentoUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([empresaId, projetoId])
+  @@index([empresaId, status])
+  @@index([empresaId, dataCriacao])
+  @@index([deletedAt])
+}
+
+model OrcamentoItem {
+  id          String    @id @default(uuid())
+  empresaId   String
+  orcamentoId String
+  orcamento   Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  descricao     String
+  quantidade    Int
+  precoUnitario Decimal @db.Decimal(18, 2)
+  subtotal      Decimal @db.Decimal(18, 2)
+
+  fornecedorId String?
+  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
+
+  @@index([empresaId, orcamentoId])
+}
+
+model Atividade {
+  id        String  @id @default(uuid())
+  empresaId String
+  projetoId String
+  projeto   Projeto @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+
+  titulo     String
+  descricao  String?
+  dataInicio DateTime
+  dataFim    DateTime
+  concluida  Boolean  @default(false)
+
+  responsaveis AtividadeResponsavel[]
+  dependencias AtividadeDependencia[] @relation("Dependencias")
+  dependenteDe AtividadeDependencia[] @relation("DependenciasReverse")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  @@index([empresaId, projetoId])
+  @@index([empresaId, concluida])
+  @@index([empresaId, dataFim])
+  @@index([deletedAt])
+}
+
+model AtividadeResponsavel {
+  id          String @id @default(uuid())
+  empresaId   String
+  atividadeId String
+  usuarioId   String
+
+  papel     String? // executor | aprovador
+  alocadoEm DateTime @default(now())
+
+  atividade Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([atividadeId, usuarioId])
+  @@index([empresaId, atividadeId])
+}
+
+model AtividadeDependencia {
+  id                   String @id @default(uuid())
+  empresaId            String
+  atividadeId          String
+  dependeDaAtividadeId String
+
+  atividade          Atividade @relation("Dependencias", fields: [atividadeId], references: [id], onDelete: Cascade)
+  dependeDaAtividade Atividade @relation("DependenciasReverse", fields: [dependeDaAtividadeId], references: [id], onDelete: Cascade)
+
+  tipo String? // FS | SS | FF | SF
+
+  @@unique([atividadeId, dependeDaAtividadeId])
+  @@index([empresaId, atividadeId])
+}
+
+model Ata {
+  id        String  @id @default(uuid())
+  empresaId String
+  projetoId String
+  projeto   Projeto @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+
+  conteudo String
+  versao   Int     @default(1)
+  rollback Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  createdById String?
+  updatedById String?
+  createdBy   Usuario? @relation("AtaCreatedBy", fields: [createdById], references: [id])
+  updatedBy   Usuario? @relation("AtaUpdatedBy", fields: [updatedById], references: [id])
+
+  @@unique([projetoId, versao])
+  @@index([empresaId, projetoId])
+  @@index([deletedAt])
+}
+
+// ===========================
+// Documentos (versionamento + IA)
+// ===========================
+model Documento {
+  id        String  @id @default(uuid())
+  empresaId String
+  projetoId String?
+  clienteId String?
+
+  categoriaId String?
+  categoria   CategoriaDocumento? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  titulo         String
+  descricao      String?
+  currentVersion Int      @default(1)
+  tags           String[]
+
+  // Metadados de armazenamento
+  storageKey      String
+  bucket          String?
+  contentType     String
+  sizeBytes       Int
+  checksum        String?
+  storageProvider String? // s3 | gcs | r2
+  metadata        Json?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  deletedById String?
+
+  createdById String?
+  updatedById String?
+  createdBy   Usuario? @relation("DocumentoCreatedBy", fields: [createdById], references: [id])
+  updatedBy   Usuario? @relation("DocumentoUpdatedBy", fields: [updatedById], references: [id])
+
+  projeto Projeto? @relation(fields: [projetoId], references: [id], onDelete: SetNull)
+  cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  versoes DocumentoVersao[]
+  // embeddings DocumentoEmbedding[] // TODO: Habilitar quando pgvector estiver ativo
+
+  @@unique([empresaId, storageKey])
+  @@index([empresaId, projetoId])
+  @@index([empresaId, clienteId])
+  @@index([empresaId, categoriaId])
+  @@index([empresaId, updatedAt])
+  @@index([deletedAt])
+}
+
+model DocumentoVersao {
+  id          String  @id @default(uuid())
+  documentoId String
+  numero      Int
+  rollback    Boolean @default(false)
+
+  storageKey  String
+  contentType String
+  sizeBytes   Int
+  checksum    String?
+
+  createdAt   DateTime @default(now())
+  createdById String?
+  createdBy   Usuario? @relation(fields: [createdById], references: [id])
+
+  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  // embeddings DocumentoEmbedding[] // TODO: Habilitar quando pgvector estiver ativo
+
+  @@unique([documentoId, numero])
+  @@index([documentoId, createdAt])
+}
+
+// TODO: Habilitar pgvector no Supabase antes de usar
+// model DocumentoEmbedding {
+//   id          String                      @id @default(uuid())
+//   documentoId String
+//   versaoId    String?
+//   embedding   Unsupported("vector(1536)")
+//   provider    String?
+//   dims        Int                         @default(1536)
+
+//   documento Documento        @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+//   versao    DocumentoVersao? @relation(fields: [versaoId], references: [id], onDelete: SetNull)
+
+//   @@index([documentoId])
+// }
+
+// ===========================
+// Lookups (seeds via UI)
+// ===========================
+model StatusProjeto {
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nome      String
+  fase      String?
+  cor       String? // Para UI
+  ordem     Int? // Para ordenação
+
+  projetos Projeto[]
+
+  @@unique([empresaId, nome])
+  @@index([empresaId, fase])
+  @@index([empresaId, ordem])
+}
+
+model CategoriaDocumento {
+  id        String  @id @default(uuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nome      String
+  descricao String?
+  cor       String? // Para UI
+  ordem     Int? // Para ordenação
+
+  documentos Documento[]
+
+  @@unique([empresaId, nome])
+  @@index([empresaId, ordem])
 }
