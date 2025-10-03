@@ -1,0 +1,277 @@
+---
+globs: *.ts,*.tsx,*.js,*.jsx
+description: "Regras de negócio específicas do ERP"
+---
+
+# 💼 ERP Business Rules — ERPInternoTech
+
+## Regras de Negócio Obrigatórias
+
+### Status de Projetos Padronizados
+```typescript
+// SEMPRE usar estes status
+export const PROJETO_STATUS = {
+  PROSPECCAO: 'Prospecção',
+  EM_ANDAMENTO: 'Em andamento',
+  CONCLUIDO: 'Concluído',
+  CANCELADO: 'Cancelado',
+  PAUSADO: 'Pausado'
+} as const;
+
+// Workflow de status
+export const PROJETO_WORKFLOW = {
+  [PROJETO_STATUS.PROSPECCAO]: [PROJETO_STATUS.EM_ANDAMENTO, PROJETO_STATUS.CANCELADO],
+  [PROJETO_STATUS.EM_ANDAMENTO]: [PROJETO_STATUS.CONCLUIDO, PROJETO_STATUS.PAUSADO, PROJETO_STATUS.CANCELADO],
+  [PROJETO_STATUS.PAUSADO]: [PROJETO_STATUS.EM_ANDAMENTO, PROJETO_STATUS.CANCELADO],
+  [PROJETO_STATUS.CONCLUIDO]: [],
+  [PROJETO_STATUS.CANCELADO]: []
+};
+```
+
+### Workflow de Orçamentos
+```typescript
+// SEMPRE implementar este workflow
+export const ORCAMENTO_STATUS = {
+  RASCUNHO: 'Rascunho',
+  ENVIADO: 'Enviado',
+  APROVADO: 'Aprovado',
+  REJEITADO: 'Rejeitado',
+  EXPIRADO: 'Expirado'
+} as const;
+
+// Transições permitidas
+export const ORCAMENTO_WORKFLOW = {
+  [ORCAMENTO_STATUS.RASCUNHO]: [ORCAMENTO_STATUS.ENVIADO, ORCAMENTO_STATUS.REJEITADO],
+  [ORCAMENTO_STATUS.ENVIADO]: [ORCAMENTO_STATUS.APROVADO, ORCAMENTO_STATUS.REJEITADO, ORCAMENTO_STATUS.EXPIRADO],
+  [ORCAMENTO_STATUS.APROVADO]: [],
+  [ORCAMENTO_STATUS.REJEITADO]: [ORCAMENTO_STATUS.RASCUNHO],
+  [ORCAMENTO_STATUS.EXPIRADO]: [ORCAMENTO_STATUS.RASCUNHO]
+};
+```
+
+### Validações de Datas
+```typescript
+// SEMPRE validar datas de projeto
+export function validateProjetoDates(dataInicio: Date, dataFim?: Date): string[] {
+  const errors: string[] = [];
+  const now = new Date();
+  
+  // Data de início não pode ser no passado
+  if (dataInicio < now) {
+    errors.push('Data de início não pode ser no passado');
+  }
+  
+  // Data de fim deve ser posterior à data de início
+  if (dataFim && dataFim <= dataInicio) {
+    errors.push('Data de fim deve ser posterior à data de início');
+  }
+  
+  return errors;
+}
+```
+
+### Cálculos de Orçamento
+```typescript
+// SEMPRE usar estes cálculos
+export function calculateOrcamentoTotal(itens: OrcamentoItem[]): number {
+  return itens.reduce((total, item) => {
+    const subtotal = item.quantidade * Number(item.precoUnitario);
+    return total + subtotal;
+  }, 0);
+}
+
+// SEMPRE validar valores
+export function validateOrcamentoItem(item: Partial<OrcamentoItem>): string[] {
+  const errors: string[] = [];
+  
+  if (!item.descricao || item.descricao.trim().length === 0) {
+    errors.push('Descrição é obrigatória');
+  }
+  
+  if (!item.quantidade || item.quantidade <= 0) {
+    errors.push('Quantidade deve ser maior que zero');
+  }
+  
+  if (!item.precoUnitario || Number(item.precoUnitario) <= 0) {
+    errors.push('Preço unitário deve ser maior que zero');
+  }
+  
+  return errors;
+}
+```
+
+## Relatórios de Pipeline
+
+### Métricas de Vendas/Projetos
+```typescript
+// SEMPRE implementar estas métricas
+export interface PipelineMetrics {
+  totalProjetos: number;
+  projetosAtivos: number;
+  projetosConcluidos: number;
+  valorTotalOrcamentos: number;
+  valorOrcamentosAprovados: number;
+  taxaConversao: number;
+  tempoMedioExecucao: number;
+}
+
+export async function calculatePipelineMetrics(empresaId: string): Promise<PipelineMetrics> {
+  const [
+    totalProjetos,
+    projetosAtivos,
+    projetosConcluidos,
+    orcamentos
+  ] = await Promise.all([
+    prisma.projeto.count({ where: { empresaId, deletedAt: null } }),
+    prisma.projeto.count({ where: { empresaId, deletedAt: null, status: { nome: 'Em andamento' } } }),
+    prisma.projeto.count({ where: { empresaId, deletedAt: null, status: { nome: 'Concluído' } } }),
+    prisma.orcamento.findMany({ where: { empresaId, deletedAt: null } })
+  ]);
+  
+  const valorTotalOrcamentos = orcamentos.reduce((sum, orc) => sum + Number(orc.valorTotal), 0);
+  const valorOrcamentosAprovados = orcamentos
+    .filter(orc => orc.status === 'APROVADO')
+    .reduce((sum, orc) => sum + Number(orc.valorTotal), 0);
+  
+  const taxaConversao = totalProjetos > 0 ? (projetosConcluidos / totalProjetos) * 100 : 0;
+  
+  return {
+    totalProjetos,
+    projetosAtivos,
+    projetosConcluidos,
+    valorTotalOrcamentos,
+    valorOrcamentosAprovados,
+    taxaConversao,
+    tempoMedioExecucao: 0 // Implementar cálculo
+  };
+}
+```
+
+### Relatórios por Período
+```typescript
+// SEMPRE gerar relatórios por período
+export async function generatePeriodReport(
+  empresaId: string, 
+  dataInicio: Date, 
+  dataFim: Date
+): Promise<PeriodReport> {
+  const projetos = await prisma.projeto.findMany({
+    where: {
+      empresaId,
+      deletedAt: null,
+      dataEntrada: {
+        gte: dataInicio,
+        lte: dataFim
+      }
+    },
+    include: {
+      orcamentos: true,
+      cliente: true
+    }
+  });
+  
+  return {
+    periodo: { dataInicio, dataFim },
+    totalProjetos: projetos.length,
+    projetosPorStatus: groupBy(projetos, 'status.nome'),
+    projetosPorCliente: groupBy(projetos, 'cliente.razaoSocial'),
+    valorTotalOrcamentos: projetos.reduce((sum, p) => 
+      sum + p.orcamentos.reduce((s, o) => s + Number(o.valorTotal), 0), 0
+    )
+  };
+}
+```
+
+## Validações de Negócio
+
+### Validação de Cliente
+```typescript
+// SEMPRE validar CNPJ
+export function validateCNPJ(cnpj: string): boolean {
+  const cleanCNPJ = cnpj.replace(/[^\d]/g, '');
+  
+  if (cleanCNPJ.length !== 14) return false;
+  
+  // Validação do algoritmo do CNPJ
+  const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  
+  const digits = cleanCNPJ.split('').map(Number);
+  
+  const sum1 = digits.slice(0, 12).reduce((sum, digit, index) => 
+    sum + digit * weights1[index], 0
+  );
+  const digit1 = sum1 % 11 < 2 ? 0 : 11 - (sum1 % 11);
+  
+  const sum2 = digits.slice(0, 13).reduce((sum, digit, index) => 
+    sum + digit * weights2[index], 0
+  );
+  const digit2 = sum2 % 11 < 2 ? 0 : 11 - (sum2 % 11);
+  
+  return digits[12] === digit1 && digits[13] === digit2;
+}
+```
+
+### Validação de Projeto
+```typescript
+// SEMPRE validar projeto antes de salvar
+export function validateProjeto(projeto: Partial<Projeto>): string[] {
+  const errors: string[] = [];
+  
+  if (!projeto.assunto || projeto.assunto.trim().length === 0) {
+    errors.push('Assunto é obrigatório');
+  }
+  
+  if (!projeto.dataEntrada) {
+    errors.push('Data de entrada é obrigatória');
+  }
+  
+  if (!projeto.clienteId) {
+    errors.push('Cliente é obrigatório');
+  }
+  
+  // Validar datas
+  if (projeto.dataEntrada && projeto.dataFim) {
+    errors.push(...validateProjetoDates(projeto.dataEntrada, projeto.dataFim));
+  }
+  
+  return errors;
+}
+```
+
+## Regras de Exportação
+
+### Exportação de Relatórios
+```typescript
+// SEMPRE implementar exportação CSV
+export function exportToCSV(data: any[], filename: string): string {
+  const headers = Object.keys(data[0] || {});
+  const csvContent = [
+    headers.join(','),
+    ...data.map(row => headers.map(header => 
+      `"${String(row[header] || '').replace(/"/g, '""')}"`
+    ).join(','))
+  ].join('\n');
+  
+  return csvContent;
+}
+
+// SEMPRE implementar exportação PDF
+export async function exportToPDF(data: any[], template: string): Promise<Buffer> {
+  // Implementar geração de PDF
+  // Usar biblioteca como PDFKit ou Puppeteer
+  throw new Error('PDF export not implemented yet');
+}
+```
+
+## Checklist de Regras de Negócio
+
+### Validações Obrigatórias
+- [ ] **Status de projetos** padronizados
+- [ ] **Workflow de orçamentos** implementado
+- [ ] **Validação de datas** em projetos
+- [ ] **Cálculos de orçamento** corretos
+- [ ] **Validação de CNPJ** implementada
+- [ ] **Métricas de pipeline** calculadas
+- [ ] **Relatórios por período** gerados
+- [ ] **Exportação CSV/PDF** funcional

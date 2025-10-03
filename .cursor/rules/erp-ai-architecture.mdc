@@ -1,0 +1,344 @@
+---
+globs: *.ts,*.tsx,*.js,*.jsx
+description: "Arquitetura de IA e embeddings para o ERP"
+---
+
+# 🤖 ERP AI Architecture — ERPInternoTech
+
+## Arquitetura de IA Obrigatória
+
+### Embeddings com pgvector
+```typescript
+// SEMPRE usar pgvector para embeddings
+export interface DocumentEmbedding {
+  id: string;
+  documentoId: string;
+  versaoId?: string;
+  embedding: number[]; // 1536 dimensões para OpenAI
+  provider: 'openai' | 'local';
+  dims: number;
+  createdAt: Date;
+}
+
+// Configuração do Supabase com pgvector
+export const supabaseConfig = {
+  url: process.env.SUPABASE_URL!,
+  anonKey: process.env.SUPABASE_ANON_KEY!,
+  serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  // Habilitar pgvector
+  dbConfig: {
+    extensions: ['vector']
+  }
+};
+```
+
+### Geração de Embeddings
+```typescript
+// SEMPRE gerar embeddings para documentos
+export async function generateEmbedding(
+  content: string, 
+  provider: 'openai' | 'local' = 'openai'
+): Promise<number[]> {
+  if (provider === 'openai') {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        input: content,
+        model: 'text-embedding-3-small' // 1536 dimensões
+      })
+    });
+    
+    const data = await response.json();
+    return data.data[0].embedding;
+  }
+  
+  // Implementar geração local se necessário
+  throw new Error('Local embedding generation not implemented');
+}
+```
+
+### Armazenamento de Embeddings
+```typescript
+// SEMPRE salvar embeddings no banco
+export async function saveDocumentEmbedding(
+  documentoId: string,
+  versaoId: string,
+  content: string,
+  empresaId: string
+): Promise<DocumentEmbedding> {
+  const embedding = await generateEmbedding(content);
+  
+  const embeddingRecord = await prisma.documentoEmbedding.create({
+    data: {
+      documentoId,
+      versaoId,
+      embedding: embedding, // pgvector automaticamente converte
+      provider: 'openai',
+      dims: 1536
+    }
+  });
+  
+  // Logar custo e latência
+  await logEmbeddingMetrics({
+    documentoId,
+    versaoId,
+    empresaId,
+    provider: 'openai',
+    dims: 1536,
+    cost: calculateEmbeddingCost(content.length),
+    latency: Date.now() - startTime
+  });
+  
+  return embeddingRecord;
+}
+```
+
+### Busca Semântica
+```typescript
+// SEMPRE implementar busca semântica
+export async function semanticSearch(
+  query: string,
+  empresaId: string,
+  filters?: {
+    projetoId?: string;
+    clienteId?: string;
+    categoriaId?: string;
+  }
+): Promise<SearchResult[]> {
+  const queryEmbedding = await generateEmbedding(query);
+  
+  // Busca usando pgvector
+  const results = await prisma.$queryRaw`
+    SELECT 
+      d.id,
+      d.titulo,
+      d.storageKey,
+      d.contentType,
+      d.createdAt,
+      p.nome as projetoNome,
+      c.razaoSocial as clienteNome,
+      1 - (de.embedding <=> ${JSON.stringify(queryEmbedding)}::vector) as similarity
+    FROM documentos d
+    JOIN documento_embeddings de ON d.id = de.documentoId
+    LEFT JOIN projetos p ON d.projetoId = p.id
+    LEFT JOIN clientes c ON d.clienteId = c.id
+    WHERE d.empresaId = ${empresaId}
+      AND d.deletedAt IS NULL
+      AND de.embedding <=> ${JSON.stringify(queryEmbedding)}::vector < 0.8
+    ORDER BY similarity DESC
+    LIMIT 20
+  `;
+  
+  return results as SearchResult[];
+}
+```
+
+## Logging de IA
+
+### Métricas de Embeddings
+```typescript
+// SEMPRE logar métricas de IA
+export interface EmbeddingMetrics {
+  documentoId: string;
+  versaoId?: string;
+  empresaId: string;
+  provider: string;
+  dims: number;
+  cost: number;
+  latency: number;
+  timestamp: string;
+}
+
+export async function logEmbeddingMetrics(metrics: EmbeddingMetrics) {
+  console.log(JSON.stringify({
+    level: 'ai_metrics',
+    event: 'embedding_generated',
+    ...metrics
+  }));
+  
+  // Salvar no banco para análise
+  await prisma.aiMetrics.create({
+    data: {
+      empresaId: metrics.empresaId,
+      event: 'embedding_generated',
+      provider: metrics.provider,
+      cost: metrics.cost,
+      latency: metrics.latency,
+      metadata: {
+        documentoId: metrics.documentoId,
+        versaoId: metrics.versaoId,
+        dims: metrics.dims
+      }
+    }
+  });
+}
+```
+
+### Cálculo de Custos
+```typescript
+// SEMPRE calcular custos de IA
+export function calculateEmbeddingCost(textLength: number): number {
+  // OpenAI text-embedding-3-small: $0.00002 per 1K tokens
+  const tokens = Math.ceil(textLength / 4); // Aproximação: 4 chars = 1 token
+  const costPer1K = 0.00002;
+  return (tokens / 1000) * costPer1K;
+}
+
+export function calculateCompletionCost(inputTokens: number, outputTokens: number): number {
+  // OpenAI gpt-4: $0.03 input, $0.06 output per 1K tokens
+  const inputCost = (inputTokens / 1000) * 0.03;
+  const outputCost = (outputTokens / 1000) * 0.06;
+  return inputCost + outputCost;
+}
+```
+
+## Versionamento de Embeddings
+
+### Sincronização com Documentos
+```typescript
+// SEMPRE versionar embeddings com documentos
+export async function updateDocumentEmbeddings(
+  documentoId: string,
+  novaVersao: number,
+  content: string,
+  empresaId: string
+) {
+  // Gerar embedding para nova versão
+  const embedding = await generateEmbedding(content);
+  
+  // Salvar nova versão do embedding
+  await prisma.documentoEmbedding.create({
+    data: {
+      documentoId,
+      versaoId: novaVersao.toString(),
+      embedding,
+      provider: 'openai',
+      dims: 1536
+    }
+  });
+  
+  // Manter histórico de versões anteriores
+  // Não deletar embeddings antigos para rollback
+}
+```
+
+### Rollback de Embeddings
+```typescript
+// SEMPRE permitir rollback de embeddings
+export async function rollbackDocumentEmbedding(
+  documentoId: string,
+  versaoAlvo: number
+) {
+  // Marcar versão atual como rollback
+  await prisma.documentoEmbedding.updateMany({
+    where: {
+      documentoId,
+      versaoId: { not: versaoAlvo.toString() }
+    },
+    data: {
+      rollback: true
+    }
+  });
+  
+  // Ativar versão alvo
+  await prisma.documentoEmbedding.updateMany({
+    where: {
+      documentoId,
+      versaoId: versaoAlvo.toString()
+    },
+    data: {
+      rollback: false
+    }
+  });
+}
+```
+
+## Prompts Padronizados
+
+### Biblioteca de Prompts
+```typescript
+// SEMPRE usar prompts padronizados
+export const PROMPTS = {
+  // Análise de documentos
+  ANALYZE_DOCUMENT: `
+    Analise o seguinte documento e extraia:
+    1. Tipo de documento
+    2. Assunto principal
+    3. Palavras-chave relevantes
+    4. Categoria sugerida
+    5. Resumo executivo
+    
+    Documento: {content}
+  `,
+  
+  // Classificação de documentos
+  CLASSIFY_DOCUMENT: `
+    Classifique o documento nas seguintes categorias:
+    - Proposta Comercial
+    - Contrato
+    - Ata de Reunião
+    - Relatório Técnico
+    - Orçamento
+    - Outros
+    
+    Documento: {content}
+    Resposta: Apenas o nome da categoria
+  `,
+  
+  // Geração de resumos
+  GENERATE_SUMMARY: `
+    Gere um resumo executivo do seguinte documento:
+    - Máximo 3 parágrafos
+    - Foco nos pontos principais
+    - Linguagem técnica apropriada
+    
+    Documento: {content}
+  `
+};
+```
+
+### Context Engineering
+```typescript
+// SEMPRE usar contexto modular
+export function buildContext(empresaId: string, modulo: string): string {
+  const contextModules = {
+    projeto: `
+      Contexto: Módulo de Projetos
+      Empresa: ${empresaId}
+      Status disponíveis: Prospecção, Em andamento, Concluído, Cancelado, Pausado
+      Campos obrigatórios: assunto, dataEntrada, clienteId
+    `,
+    cliente: `
+      Contexto: Módulo de Clientes
+      Empresa: ${empresaId}
+      Validações: CNPJ obrigatório, razão social única por empresa
+      Relacionamentos: Projetos, Documentos, Representantes
+    `,
+    documento: `
+      Contexto: Módulo de Documentos
+      Empresa: ${empresaId}
+      Versionamento: Sempre criar nova versão, manter histórico
+      Embeddings: Gerar automaticamente para busca semântica
+    `
+  };
+  
+  return contextModules[modulo] || '';
+}
+```
+
+## Checklist de IA
+
+### Implementações Obrigatórias
+- [ ] **pgvector** configurado no Supabase
+- [ ] **Embeddings** gerados automaticamente
+- [ ] **Busca semântica** implementada
+- [ ] **Métricas de IA** logadas
+- [ ] **Custos** calculados e monitorados
+- [ ] **Versionamento** de embeddings
+- [ ] **Rollback** de embeddings
+- [ ] **Prompts** padronizados
+- [ ] **Contexto modular** implementado

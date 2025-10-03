@@ -1,0 +1,400 @@
+---
+alwaysApply: false
+description: "Roadmap técnico e estratégia CTO para o ERP"
+---
+
+# 🚀 ERP CTO Roadmap — ERPInternoTech
+
+## Estratégia Técnica MVP
+
+### CI/CD Mínimo Obrigatório
+```yaml
+# .github/workflows/ci-cd.yml
+name: ERP CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Test
+        run: npm run test
+      
+      - name: Build
+        run: npm run build
+
+  deploy-preview:
+    needs: quality
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Deploy to Preview
+        run: |
+          # Deploy automático para Preview/Homologação
+          npm run deploy:preview
+
+  deploy-production:
+    needs: quality
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Deploy to Production
+        run: |
+          # Deploy controlado para Produção
+          npm run deploy:production
+```
+
+### Deploy Strategy
+```typescript
+// Estratégia de Deploy
+export const DEPLOY_STRATEGY = {
+  // Desenvolvimento: Deploy automático
+  develop: {
+    autoDeploy: true,
+    environment: 'preview',
+    url: 'https://erp-preview.vercel.app'
+  },
+  
+  // Produção: Deploy controlado
+  main: {
+    autoDeploy: false,
+    environment: 'production',
+    url: 'https://erp.tech.com',
+    requiresApproval: true
+  }
+};
+```
+
+## Roadmap Pós-MVP
+
+### Fase 2: Autenticação e RBAC
+```typescript
+// Preparação para Fase 2
+export interface AuthUser {
+  id: string;
+  email: string;
+  empresaId: string;
+  role: 'admin' | 'manager' | 'user' | 'viewer';
+  permissions: string[];
+}
+
+export const RBAC_PERMISSIONS = {
+  // Projetos
+  'projetos:read': ['admin', 'manager', 'user', 'viewer'],
+  'projetos:write': ['admin', 'manager', 'user'],
+  'projetos:delete': ['admin', 'manager'],
+  
+  // Clientes
+  'clientes:read': ['admin', 'manager', 'user', 'viewer'],
+  'clientes:write': ['admin', 'manager', 'user'],
+  'clientes:delete': ['admin', 'manager'],
+  
+  // Orçamentos
+  'orcamentos:read': ['admin', 'manager', 'user', 'viewer'],
+  'orcamentos:write': ['admin', 'manager', 'user'],
+  'orcamentos:approve': ['admin', 'manager'],
+  
+  // Documentos
+  'documentos:read': ['admin', 'manager', 'user', 'viewer'],
+  'documentos:write': ['admin', 'manager', 'user'],
+  'documentos:delete': ['admin', 'manager']
+};
+```
+
+### Fase 3: Observabilidade Avançada
+```typescript
+// Observabilidade Avançada
+export interface ObservabilityConfig {
+  // Logs estruturados
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
+    format: 'json';
+    destinations: ['console', 'supabase', 'external'];
+  };
+  
+  // Métricas
+  metrics: {
+    performance: ['response_time', 'throughput', 'error_rate'];
+    business: ['projetos_criados', 'orcamentos_aprovados', 'documentos_uploaded'];
+    infrastructure: ['cpu', 'memory', 'disk', 'network'];
+  };
+  
+  // Alertas
+  alerts: {
+    error_rate_threshold: 5; // %
+    response_time_threshold: 2000; // ms
+    disk_usage_threshold: 80; // %
+  };
+}
+```
+
+### Fase 4: Integrações Externas
+```typescript
+// Integrações Planejadas
+export const INTEGRATIONS_ROADMAP = {
+  // Fase 4.1: Integrações Básicas
+  phase4_1: [
+    'Email (SendGrid)',
+    'Notificações (Slack)',
+    'Backup (AWS S3)',
+    'Monitoramento (DataDog)'
+  ],
+  
+  // Fase 4.2: Integrações Avançadas
+  phase4_2: [
+    'CRM (HubSpot)',
+    'Contabilidade (QuickBooks)',
+    'Pagamentos (Stripe)',
+    'Assinatura Digital (DocuSign)'
+  ],
+  
+  // Fase 4.3: IA Avançada
+  phase4_3: [
+    'Análise de Sentimento',
+    'Previsão de Vendas',
+    'Otimização de Processos',
+    'Chatbot Avançado'
+  ]
+};
+```
+
+## Arquitetura Escalável
+
+### Microserviços (Futuro)
+```typescript
+// Preparação para Microserviços
+export const MICROSERVICES_ARCHITECTURE = {
+  // API Gateway
+  gateway: {
+    service: 'api-gateway',
+    port: 3000,
+    responsibilities: ['routing', 'auth', 'rate_limiting']
+  },
+  
+  // Serviços de Domínio
+  services: {
+    'projetos-service': {
+      port: 3001,
+      database: 'projetos_db',
+      responsibilities: ['CRUD projetos', 'workflow status']
+    },
+    'clientes-service': {
+      port: 3002,
+      database: 'clientes_db',
+      responsibilities: ['CRUD clientes', 'validação CNPJ']
+    },
+    'documentos-service': {
+      port: 3003,
+      database: 'documentos_db',
+      responsibilities: ['upload', 'versionamento', 'embeddings']
+    },
+    'orcamentos-service': {
+      port: 3004,
+      database: 'orcamentos_db',
+      responsibilities: ['CRUD orçamentos', 'cálculos', 'workflow']
+    }
+  }
+};
+```
+
+### Event-Driven Architecture
+```typescript
+// Eventos do Sistema
+export interface SystemEvent {
+  id: string;
+  type: string;
+  aggregateId: string;
+  aggregateType: string;
+  version: number;
+  data: Record<string, any>;
+  metadata: {
+    tenantId: string;
+    userId: string;
+    timestamp: string;
+  };
+}
+
+export const SYSTEM_EVENTS = {
+  // Projetos
+  'projeto.created': 'Projeto criado',
+  'projeto.status_changed': 'Status do projeto alterado',
+  'projeto.completed': 'Projeto concluído',
+  
+  // Orçamentos
+  'orcamento.created': 'Orçamento criado',
+  'orcamento.approved': 'Orçamento aprovado',
+  'orcamento.rejected': 'Orçamento rejeitado',
+  
+  // Documentos
+  'documento.uploaded': 'Documento enviado',
+  'documento.versioned': 'Nova versão criada',
+  'documento.rolled_back': 'Versão revertida'
+};
+```
+
+## Performance e Escalabilidade
+
+### Otimizações Obrigatórias
+```typescript
+// Cache Strategy
+export const CACHE_STRATEGY = {
+  // Redis para cache de sessão
+  session: {
+    provider: 'redis',
+    ttl: 3600, // 1 hora
+    keyPrefix: 'erp:session:'
+  },
+  
+  // Cache de consultas frequentes
+  queries: {
+    provider: 'redis',
+    ttl: 300, // 5 minutos
+    keyPrefix: 'erp:query:',
+    patterns: [
+      'projetos:list:*',
+      'clientes:list:*',
+      'orcamentos:list:*'
+    ]
+  },
+  
+  // CDN para assets estáticos
+  assets: {
+    provider: 'vercel',
+    ttl: 86400, // 24 horas
+    patterns: ['*.js', '*.css', '*.png', '*.jpg']
+  }
+};
+```
+
+### Database Optimization
+```sql
+-- Índices obrigatórios para performance
+CREATE INDEX CONCURRENTLY idx_projetos_empresa_status_data 
+ON projetos(empresaId, statusId, dataEntrada) 
+WHERE deletedAt IS NULL;
+
+CREATE INDEX CONCURRENTLY idx_documentos_empresa_tipo_data 
+ON documentos(empresaId, categoriaId, createdAt) 
+WHERE deletedAt IS NULL;
+
+CREATE INDEX CONCURRENTLY idx_orcamentos_empresa_status_valor 
+ON orcamentos(empresaId, status, valorTotal) 
+WHERE deletedAt IS NULL;
+
+-- Particionamento por empresa (futuro)
+CREATE TABLE projetos_partitioned (
+  LIKE projetos INCLUDING ALL
+) PARTITION BY HASH (empresaId);
+```
+
+## Monitoramento e Alertas
+
+### Health Checks
+```typescript
+// Health Check Completo
+export async function healthCheck(): Promise<HealthStatus> {
+  const checks = await Promise.allSettled([
+    checkDatabase(),
+    checkRedis(),
+    checkSupabase(),
+    checkExternalAPIs()
+  ]);
+  
+  const status = checks.every(check => check.status === 'fulfilled') ? 'healthy' : 'unhealthy';
+  
+  return {
+    status,
+    timestamp: new Date().toISOString(),
+    checks: {
+      database: checks[0].status === 'fulfilled' ? 'ok' : 'error',
+      redis: checks[1].status === 'fulfilled' ? 'ok' : 'error',
+      supabase: checks[2].status === 'fulfilled' ? 'ok' : 'error',
+      external: checks[3].status === 'fulfilled' ? 'ok' : 'error'
+    },
+    metrics: {
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      cpu: process.cpuUsage()
+    }
+  };
+}
+```
+
+### Alertas Automáticos
+```typescript
+// Sistema de Alertas
+export const ALERT_RULES = {
+  // Performance
+  high_response_time: {
+    condition: 'response_time > 2000ms',
+    severity: 'warning',
+    action: 'scale_up'
+  },
+  
+  // Erros
+  high_error_rate: {
+    condition: 'error_rate > 5%',
+    severity: 'critical',
+    action: 'alert_team'
+  },
+  
+  // Negócio
+  no_projects_created: {
+    condition: 'projetos_criados == 0 for 24h',
+    severity: 'info',
+    action: 'notify_management'
+  }
+};
+```
+
+## Checklist CTO
+
+### MVP (Fase 1)
+- [ ] **CI/CD** configurado com deploy automático
+- [ ] **Preview/Homologação** funcionando
+- [ ] **Produção** com deploy controlado
+- [ ] **Health checks** implementados
+- [ ] **Logs básicos** estruturados
+- [ ] **Backup** configurado
+- [ ] **Monitoramento** básico ativo
+
+### Fase 2 (Autenticação)
+- [ ] **JWT/Supabase Auth** implementado
+- [ ] **RBAC** configurado
+- [ ] **Middleware** de autorização
+- [ ] **Sessões** gerenciadas
+- [ ] **Logout** seguro implementado
+
+### Fase 3 (Observabilidade)
+- [ ] **Métricas avançadas** implementadas
+- [ ] **Alertas automáticos** configurados
+- [ ] **Dashboards** de monitoramento
+- [ ] **Tracing distribuído** ativo
+- [ ] **Análise de performance** automatizada
+
+### Fase 4 (Integrações)
+- [ ] **API Gateway** implementado
+- [ ] **Microserviços** separados
+- [ ] **Event-driven** architecture
+- [ ] **Integrações externas** ativas
+- [ ] **Escalabilidade** horizontal

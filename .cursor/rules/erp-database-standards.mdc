@@ -1,0 +1,190 @@
+---
+globs: *.prisma,*.ts,*.sql
+description: "Padrões de banco de dados e Prisma para o ERP"
+---
+
+# 🗄️ ERP Database Standards — ERPInternoTech
+
+## Regras de Schema Prisma
+
+### Campos Obrigatórios em TODOS os Modelos
+```prisma
+model BaseModel {
+  id        String    @id @default(cuid())
+  empresaId String    // OBRIGATÓRIO - Multi-tenancy
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // OBRIGATÓRIO - Soft delete
+  deletedById String? // Auditoria de exclusão
+}
+```
+
+### Índices Compostos Obrigatórios
+```prisma
+// Sempre incluir empresaId nos índices
+@@index([empresaId, status])
+@@index([empresaId, createdAt])
+@@index([empresaId, deletedAt])
+@@unique([empresaId, campoUnico])
+```
+
+### Relacionamentos Multi-Tenant
+```prisma
+// Sempre validar empresaId em relacionamentos
+model Projeto {
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  
+  // Sempre incluir empresaId em relacionamentos
+  @@index([empresaId, clienteId])
+}
+```
+
+## Seeds Versionados Obrigatórios
+
+### Estrutura de Seeds
+```typescript
+// prisma/seed.ts
+export const seedVersion = "1.0.0";
+
+export const seedData = {
+  empresas: [
+    {
+      id: "empresa-1",
+      razaoSocial: "Tech Solutions LTDA",
+      nomeFantasia: "Tech Solutions",
+      cnpj: "12345678000199",
+      endereco: "Rua das Flores, 123"
+    }
+  ],
+  statusProjetos: [
+    { id: "status-1", empresaId: "empresa-1", nome: "Prospecção", fase: "inicial" },
+    { id: "status-2", empresaId: "empresa-1", nome: "Em andamento", fase: "execucao" },
+    { id: "status-3", empresaId: "empresa-1", nome: "Concluído", fase: "finalizada" }
+  ]
+};
+```
+
+### Documentação de Seeds
+```markdown
+# Seeds v1.0.0
+
+## Empresas
+- Tech Solutions LTDA (empresa-1)
+
+## Status de Projetos
+- Prospecção (inicial)
+- Em andamento (execução)
+- Concluído (finalizada)
+
+## Classificação para IA
+- empresaId: "empresa-1" é o tenant padrão
+- Status seguem workflow: Prospecção → Em andamento → Concluído
+```
+
+## Migrations Obrigatórias
+
+### Estrutura de Migration
+```sql
+-- Sempre incluir empresaId
+-- Sempre incluir soft delete
+-- Sempre incluir índices compostos
+
+-- Exemplo: Create Projetos table
+CREATE TABLE "projetos" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "empresaId" TEXT NOT NULL,
+  "clienteId" TEXT NOT NULL,
+  "assunto" TEXT NOT NULL,
+  "statusId" TEXT,
+  "dataEntrada" TIMESTAMP(3) NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "deletedAt" TIMESTAMP(3),
+  "deletedById" TEXT
+);
+
+-- Índices compostos obrigatórios
+CREATE INDEX "projetos_empresa_status_idx" ON "projetos"("empresaId", "statusId");
+CREATE INDEX "projetos_empresa_cliente_idx" ON "projetos"("empresaId", "clienteId");
+CREATE INDEX "projetos_empresa_data_idx" ON "projetos"("empresaId", "dataEntrada");
+CREATE INDEX "projetos_deleted_at_idx" ON "projetos"("deletedAt");
+```
+
+## Queries Prisma Padrão
+
+### Query com Multi-Tenancy
+```typescript
+// SEMPRE incluir empresaId
+const projetos = await prisma.projeto.findMany({
+  where: {
+    empresaId: req.empresaId, // OBRIGATÓRIO
+    deletedAt: null, // OBRIGATÓRIO
+    // outros filtros...
+  },
+  include: {
+    cliente: true,
+    status: true
+  }
+});
+```
+
+### Query com Soft Delete
+```typescript
+// SEMPRE filtrar deletedAt
+const clientes = await prisma.cliente.findMany({
+  where: {
+    empresaId: req.empresaId,
+    deletedAt: null, // OBRIGATÓRIO
+    // outros filtros...
+  }
+});
+```
+
+### Soft Delete Update
+```typescript
+// SEMPRE usar soft delete
+const cliente = await prisma.cliente.update({
+  where: { id: clienteId },
+  data: {
+    deletedAt: new Date(),
+    deletedById: req.userId
+  }
+});
+```
+
+## Backup e Export
+
+### Plano de Backup Mínimo
+```typescript
+// scripts/backup.ts
+export async function createBackup(empresaId: string) {
+  const backup = {
+    version: "1.0.0",
+    empresaId,
+    timestamp: new Date().toISOString(),
+    data: {
+      empresas: await prisma.empresa.findMany({ where: { id: empresaId } }),
+      clientes: await prisma.cliente.findMany({ where: { empresaId, deletedAt: null } }),
+      projetos: await prisma.projeto.findMany({ where: { empresaId, deletedAt: null } })
+    }
+  };
+  
+  return backup;
+}
+```
+
+## Validações de Schema
+
+### Checklist Obrigatório
+- [ ] **empresaId** em todos os modelos
+- [ ] **deletedAt** em todos os modelos
+- [ ] **Índices compostos** com empresaId
+- [ ] **Relacionamentos** validam tenant
+- [ ] **Seeds versionados** documentados
+- [ ] **Migrations** incluem índices
+- [ ] **Soft delete** implementado
+- [ ] **Backup** configurado
