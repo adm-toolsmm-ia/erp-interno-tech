@@ -1,0 +1,329 @@
+---
+alwaysApply: true
+description: "Atualização obrigatória do README.md e CHANGELOG.md em cada nova funcionalidade ou mudança relevante"
+---
+
+# 📄 Documentação de Mudanças
+
+## README.md
+- Toda **nova funcionalidade** deve ser documentada no `README.md`.
+- O `README.md` deve seguir a **estrutura padronizada** obrigatória.
+
+### Estrutura Obrigatória do README.md
+```md
+# App Gestão Pessoal
+
+## 🚀 Funcionalidades Atuais
+- [Lista de funcionalidades implementadas]
+
+## 📦 Instalação
+```bash
+npm install
+npm run dev
+```
+
+## 🔧 Configurações de Ambiente
+```bash
+# .env
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_anon_key
+# ... outras variáveis
+```
+
+## 📖 Como Usar
+[Instruções de uso básico]
+
+## 🎯 Exemplos de Uso
+[Exemplos práticos com código]
+
+## 🔗 Dependências
+[Lista de dependências externas]
+
+## 📚 Documentação Adicional
+[Links para docs específicas]
+```
+
+### Exemplo de Atualização no README
+```md
+## 🚀 Funcionalidades Atuais
+- ✅ Autenticação JWT
+- ✅ Gestão de usuários
+- ✅ **NOVA**: Exportação de relatórios em PDF
+- ✅ Dashboard de métricas
+
+## 🎯 Exemplos de Uso
+
+### Exportação de Relatórios
+```typescript
+// Exportar relatório de vendas
+const report = await crm.reports.export({ 
+  format: "pdf", 
+  orderId: "12345",
+  tenantId: "tenant-abc"
+});
+
+// Download automático
+window.open(report.downloadUrl);
+```
+
+### Dependências
+- **Supabase**: Configurar permissão `reports:export` no RLS
+- **PDFKit**: Para geração de PDFs
+- **Multer**: Para upload de arquivos
+```
+
+---
+
+## CHANGELOG.md
+- Toda mudança significativa deve ser listada no `CHANGELOG.md`.
+- Seguir **versionamento semântico (SemVer)**:  
+  - `MAJOR` → mudanças incompatíveis.  
+  - `MINOR` → novas funcionalidades retrocompatíveis.  
+  - `PATCH` → correções retrocompatíveis.  
+
+### Formato obrigatório
+```md
+## [1.2.0] - 2025-09-21
+### Added
+- Exportação de relatórios em PDF
+
+### Changed
+- Melhorias na performance da API de clientes
+
+### Fixed
+- Corrigido bug de autenticação em múltiplos tenants
+
+### Security
+- Atualizada dependência `jsonwebtoken` para versão segura
+```
+
+---
+
+## Regras Gerais
+
+* Nunca mergear uma nova funcionalidade sem atualizar `README.md` e `CHANGELOG.md`.
+* Revisores devem bloquear PRs que não incluam essas atualizações.
+* Releases devem sempre ter versão incrementada no `CHANGELOG.md`.
+
+---
+
+## Integração com CI/CD
+
+### Validação Automática Avançada
+```yaml
+# .github/workflows/docs-check.yml
+name: Documentation Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Check Documentation Updates
+        run: |
+          # Verificar se arquivos de docs foram alterados
+          if ! git diff --name-only origin/main...HEAD | grep -Eq "README.md|CHANGELOG.md"; then
+            echo "❌ PR must update README.md or CHANGELOG.md"
+            exit 1
+          fi
+          
+          # Verificar se commits Feat: ou Fix: alteraram CHANGELOG.md
+          if git log --oneline origin/main...HEAD | grep -E "^(feat|fix):" && ! git diff --name-only origin/main...HEAD | grep -q "CHANGELOG.md"; then
+            echo "❌ Feat/Fix commits must update CHANGELOG.md"
+            exit 1
+          fi
+          
+          # Validar formato do CHANGELOG.md
+          if git diff --name-only origin/main...HEAD | grep -q "CHANGELOG.md"; then
+            echo "🔍 Validating CHANGELOG.md format..."
+            if ! grep -q "## \[.*\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md; then
+              echo "❌ CHANGELOG.md must follow format: ## [version] - YYYY-MM-DD"
+              exit 1
+            fi
+          fi
+          
+          # Validar estrutura do README.md
+          if git diff --name-only origin/main...HEAD | grep -q "README.md"; then
+            echo "🔍 Validating README.md structure..."
+            if ! grep -q "## 🚀 Funcionalidades Atuais" README.md; then
+              echo "❌ README.md must include 'Funcionalidades Atuais' section"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Documentation validation passed"
+      
+      - name: Check Semantic Versioning
+        run: |
+          if git diff --name-only origin/main...HEAD | grep -q "CHANGELOG.md"; then
+            # Extrair versão do CHANGELOG.md
+            VERSION=$(grep -o "## \[.*\]" CHANGELOG.md | head -1 | sed 's/## \[//' | sed 's/\]//')
+            echo "Found version: $VERSION"
+            
+            # Validar formato SemVer
+            if ! echo "$VERSION" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$"; then
+              echo "❌ Version must follow SemVer format (e.g., 1.2.3)"
+              exit 1
+            fi
+          fi
+```
+
+### Release Automation
+```yaml
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'CHANGELOG.md'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install standard-version
+        run: npm install -g standard-version
+      
+      - name: Create Release
+        run: |
+          # Extrair versão do CHANGELOG.md
+          VERSION=$(grep -o "## \[.*\]" CHANGELOG.md | head -1 | sed 's/## \[//' | sed 's/\]//')
+          
+          # Criar tag e release
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+          
+          # Criar release no GitHub
+          gh release create "v$VERSION" \
+            --title "Release v$VERSION" \
+            --notes-file <(grep -A 1000 "## \[$VERSION\]" CHANGELOG.md | head -50)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+---
+
+## 🔧 Automação com standard-version
+
+### Configuração do package.json
+```json
+{
+  "scripts": {
+    "release": "standard-version",
+    "release:minor": "standard-version --release-as minor",
+    "release:major": "standard-version --release-as major",
+    "release:patch": "standard-version --release-as patch"
+  },
+  "standard-version": {
+    "skip": {
+      "changelog": false,
+      "commit": false,
+      "tag": false
+    },
+    "types": {
+      "feat": {
+        "section": "Features"
+      },
+      "fix": {
+        "section": "Bug Fixes"
+      },
+      "chore": {
+        "section": "Chores"
+      },
+      "docs": {
+        "section": "Documentation"
+      },
+      "style": {
+        "section": "Styles"
+      },
+      "refactor": {
+        "section": "Code Refactoring"
+      },
+      "perf": {
+        "section": "Performance Improvements"
+      },
+      "test": {
+        "section": "Tests"
+      }
+    }
+  }
+}
+```
+
+### Uso do standard-version
+```bash
+# Release automático baseado nos commits
+npm run release
+
+# Release específico
+npm run release:minor  # 1.0.0 -> 1.1.0
+npm run release:major  # 1.0.0 -> 2.0.0
+npm run release:patch  # 1.0.0 -> 1.0.1
+```
+
+## 📋 Checklist de Revisão para Revisores
+
+### Antes de Aprovar PR
+- [ ] **README.md** foi atualizado com nova funcionalidade?
+- [ ] **CHANGELOG.md** foi atualizado com versão correta?
+- [ ] **Versão segue SemVer** (MAJOR.MINOR.PATCH)?
+- [ ] **Estrutura do README** inclui seções obrigatórias?
+- [ ] **Exemplos de código** estão funcionais?
+- [ ] **Dependências** estão documentadas?
+- [ ] **Commits Feat:/Fix:** alteraram CHANGELOG.md?
+
+### Validação de Conteúdo
+- [ ] **Descrição clara** da funcionalidade no README
+- [ ] **Exemplos práticos** com código TypeScript
+- [ ] **Instruções de instalação** atualizadas
+- [ ] **Configurações de ambiente** documentadas
+- [ ] **Links funcionais** para documentação adicional
+
+### Validação de Formato
+- [ ] **CHANGELOG.md** segue formato `## [versão] - YYYY-MM-DD`
+- [ ] **Categorias corretas**: Added, Changed, Fixed, Security
+- [ ] **README.md** tem seção "Funcionalidades Atuais"
+- [ ] **Emojis consistentes** em títulos
+- [ ] **Código formatado** com syntax highlighting
+
+# ✅ Checklist Score 10
+
+### Documentação
+- [ ] **README.md** atualizado com cada nova funcionalidade
+- [ ] **CHANGELOG.md** atualizado em cada mudança relevante
+- [ ] **Estrutura padronizada** do README seguida
+- [ ] **Formato SemVer** respeitado no CHANGELOG
+- [ ] **Exemplos práticos** incluídos
+
+### Automação
+- [ ] **CI valida** alterações em docs automaticamente
+- [ ] **Commits Feat:/Fix:** obrigam atualização do CHANGELOG
+- [ ] **Formato SemVer** validado automaticamente
+- [ ] **Release automation** configurada
+- [ ] **standard-version** integrado
+
+### Qualidade
+- [ ] **PRs sem docs** são bloqueados automaticamente
+- [ ] **Revisores** seguem checklist de validação
+- [ ] **Estrutura consistente** em toda documentação
+- [ ] **Links funcionais** e exemplos testados
+- [ ] **Versionamento** sempre incrementado

@@ -1,0 +1,1151 @@
+---
+alwaysApply: true
+description: "Regras de integração com Supabase, Vercel, Supabaselogs, N8N, Notion, Google Drive, Supabase Auth e Upstash (Redis)"
+---
+
+# ⚙️ Integrações — Regras Gerais
+- **Sempre usar `tenantId`** em dados, chaves e logs (multi-tenant)
+- **Nunca armazenar segredos/credenciais** fora do `.env` ou Vault
+- **Não registrar PII sensível** em logs, cache ou integrações externas
+- **Toda integração deve estar documentada** em `/docs/integrations.md`
+
+## 🌐 Vercel (Hosting/CI/CD)
+- **Deploys apenas a partir da branch `main`**
+- **Preview Deploy obrigatório** para cada PR
+- **Variáveis de ambiente configuradas** via painel da Vercel, nunca commitadas
+
+### Configuração Vercel
+```json
+// vercel.json - Configuração de deploy
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
+```
+
+### Deploy Strategy
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.ORG_ID }}
+          vercel-project-id: ${{ secrets.PROJECT_ID }}
+          vercel-args: '--prod'
+```
+
+## 🗄️ Supabase (DB, Storage, APIs)
+
+### Banco de Dados
+- **RLS sempre habilitado** em todas as tabelas
+- **Queries devem filtrar por `tenantId`**
+- **Migrations sempre versionadas** (`supabase migration new`)
+
+```sql
+-- Exemplo de tabela com RLS
+CREATE TABLE users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  email TEXT NOT NULL,
+  name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Habilitar RLS
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+-- Política de RLS
+CREATE POLICY "Users can only see their tenant data" ON users
+  FOR ALL USING (tenant_id = auth.jwt() ->> 'tenant_id');
+```
+
+### Storage
+- **Buckets separados por tenant**
+- **Políticas de acesso explícitas**
+
+```typescript
+// Exemplo de upload com tenantId
+const uploadFile = async (file: File, tenantId: string): Promise<string> => {
+  const fileName = `${tenantId}/${Date.now()}-${file.name}`;
+  
+  const { data, error } = await supabase.storage
+    .from(`tenant-${tenantId}`)
+    .upload(fileName, file);
+    
+  if (error) throw error;
+  return data.path;
+};
+```
+
+### Edge Functions
+- **Usar apenas para lógica próxima ao banco**
+- **Sempre com logging estruturado**
+
+```typescript
+// supabase/functions/process-data/index.ts
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
+serve(async (req) => {
+  const { tenantId, data } = await req.json();
+  
+  // Log estruturado
+  console.log(JSON.stringify({
+    event: 'process_data_start',
+    tenantId,
+    requestId: crypto.randomUUID(),
+    timestamp: new Date().toISOString()
+  }));
+  
+  // Processar dados
+  const result = await processData(data, tenantId);
+  
+  return new Response(JSON.stringify({ success: true, result }));
+});
+```
+
+## 🔐 Supabase Auth
+- **JWT obrigatório** em toda rota protegida
+- **Associar `tenantId` ao usuário autenticado**
+- **MFA habilitado** quando suportado
+- **Revogar sessões no logout**
+
+### Middleware de Autenticação
+```typescript
+// auth.middleware.ts
+import { createClient } from '@supabase/supabase-js';
+import { Request, Response, NextFunction } from 'express';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  tenantId: string;
+  role: string;
+}
+
+export const authMiddleware = async (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      res.status(401).json({ error: 'Token não fornecido' });
+      return;
+    }
+    
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!
+    );
+    
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      res.status(401).json({ error: 'Token inválido' });
+      return;
+    }
+    
+    // Verificar tenantId no JWT
+    const tenantId = user.user_metadata?.tenant_id;
+    if (!tenantId) {
+      res.status(403).json({ error: 'TenantId não encontrado no token' });
+      return;
+    }
+    
+    // Adicionar usuário autenticado ao request
+    req.user = {
+      id: user.id,
+      email: user.email!,
+      tenantId,
+      role: user.user_metadata?.role || 'user'
+    };
+    
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno de autenticação' });
+  }
+};
+```
+
+### Configuração de MFA
+```typescript
+// auth.service.ts
+export class AuthService {
+  async enableMFA(userId: string): Promise<{ qrCode: string; secret: string }> {
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: 'totp'
+    });
+    
+    if (error) throw error;
+    
+    return {
+      qrCode: data.qr_code,
+      secret: data.secret
+    };
+  }
+  
+  async verifyMFA(userId: string, code: string): Promise<boolean> {
+    const { data, error } = await supabase.auth.mfa.challenge({
+      factorId: 'totp'
+    });
+    
+    if (error) throw error;
+    
+    const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
+      factorId: 'totp',
+      challengeId: data.id,
+      code
+    });
+    
+    return !verifyError && verifyData;
+  }
+  
+  async revokeAllSessions(userId: string): Promise<void> {
+    const { error } = await supabase.auth.admin.signOut(userId, 'global');
+    if (error) throw error;
+  }
+}
+```
+
+### RLS com TenantId
+```sql
+-- Política de RLS para associar tenantId ao usuário
+CREATE POLICY "Users can only access their tenant data" ON users
+  FOR ALL USING (
+    tenant_id = (
+      SELECT user_metadata->>'tenant_id' 
+      FROM auth.users 
+      WHERE id = auth.uid()
+    )::uuid
+  );
+
+-- Função para obter tenantId do usuário autenticado
+CREATE OR REPLACE FUNCTION auth.tenant_id()
+RETURNS uuid AS $$
+  SELECT (auth.jwt() ->> 'user_metadata')::json ->> 'tenant_id'::uuid;
+$$ LANGUAGE sql SECURITY DEFINER;
+```
+
+## 📊 Supabaselogs
+- **Todo erro crítico deve ser registrado** no Supabaselogs
+- **Logs obrigatórios**: `event`, `tenantId`, `requestId`, `userId`, `payloadShape`
+- **Nunca logar senhas, tokens ou dados de pagamento**
+- **Monitorar performance** (p95, p99)
+
+### Logger Estruturado Avançado
+```typescript
+// logger.service.ts
+import { createClient } from '@supabase/supabase-js';
+
+interface LogContext {
+  tenantId: string;
+  requestId: string;
+  userId?: string;
+  correlationId?: string;
+}
+
+interface LogEntry {
+  event: string;
+  tenantId: string;
+  requestId: string;
+  userId?: string;
+  correlationId?: string;
+  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+  payload: Record<string, any>;
+  timestamp: string;
+  service: string;
+  version: string;
+  environment: string;
+}
+
+export class SupabaseLogger {
+  private supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  async log(
+    level: LogEntry['level'],
+    event: string,
+    payload: Record<string, any>,
+    context: LogContext
+  ): Promise<void> {
+    const logEntry: LogEntry = {
+      event,
+      tenantId: context.tenantId,
+      requestId: context.requestId,
+      userId: context.userId,
+      correlationId: context.correlationId,
+      level,
+      payload: this.sanitizePayload(payload),
+      timestamp: new Date().toISOString(),
+      service: process.env.SERVICE_NAME || 'app-gestao-pessoal',
+      version: process.env.SERVICE_VERSION || '1.0.0',
+      environment: process.env.NODE_ENV || 'development'
+    };
+
+    try {
+      await this.supabase.from('logs').insert(logEntry);
+    } catch (error) {
+      console.error('Failed to log to Supabase:', error);
+    }
+  }
+
+  async info(event: string, payload: Record<string, any>, context: LogContext): Promise<void> {
+    await this.log('info', event, payload, context);
+  }
+
+  async error(event: string, error: Error, context: LogContext): Promise<void> {
+    await this.log('error', event, {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      ...payload
+    }, context);
+  }
+
+  async performance(
+    operation: string,
+    duration: number,
+    context: LogContext,
+    metadata: Record<string, any> = {}
+  ): Promise<void> {
+    await this.log('info', 'performance_metric', {
+      operation,
+      duration,
+      ...metadata
+    }, context);
+  }
+
+  private sanitizePayload(payload: Record<string, any>): Record<string, any> {
+    const sensitiveKeys = [
+      'password', 'token', 'secret', 'key', 'creditCard', 'ssn', 'cpf',
+      'creditCardNumber', 'cvv', 'pin', 'apiKey', 'privateKey'
+    ];
+    
+    return Object.keys(payload).reduce((acc, key) => {
+      const lowerKey = key.toLowerCase();
+      if (sensitiveKeys.some(sensitive => lowerKey.includes(sensitive))) {
+        acc[key] = '[REDACTED]';
+      } else if (typeof payload[key] === 'object' && payload[key] !== null) {
+        acc[key] = this.sanitizePayload(payload[key]);
+      } else {
+        acc[key] = payload[key];
+      }
+      return acc;
+    }, {} as Record<string, any>);
+  }
+}
+
+// Uso do logger
+const logger = new SupabaseLogger();
+
+// Exemplo de uso em controller
+export const createUser = async (req: Request, res: Response) => {
+  const context: LogContext = {
+    tenantId: req.user.tenantId,
+    requestId: req.headers['x-request-id'] as string,
+    userId: req.user.id
+  };
+
+  try {
+    logger.info('user_creation_started', {
+      email: req.body.email,
+      role: req.body.role
+    }, context);
+
+    const user = await userService.create(req.body);
+    
+    logger.info('user_creation_success', {
+      userId: user.id,
+      email: user.email
+    }, context);
+
+    res.status(201).json(user);
+  } catch (error) {
+    logger.error('user_creation_failed', error as Error, context);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+```
+
+### Métricas de Performance
+```typescript
+// performance.monitor.ts
+export class PerformanceMonitor {
+  private logger: SupabaseLogger;
+
+  constructor(logger: SupabaseLogger) {
+    this.logger = logger;
+  }
+
+  async measure<T>(
+    operation: string,
+    fn: () => Promise<T>,
+    context: LogContext
+  ): Promise<T> {
+    const start = performance.now();
+    
+    try {
+      const result = await fn();
+      const duration = performance.now() - start;
+      
+      await this.logger.performance(operation, duration, context, {
+        success: true
+      });
+      
+      return result;
+    } catch (error) {
+      const duration = performance.now() - start;
+      
+      await this.logger.performance(operation, duration, context, {
+        success: false,
+        error: (error as Error).message
+      });
+      
+      throw error;
+    }
+  }
+}
+```
+
+## ⚡ Upstash (Cache/Redis)
+- **Sempre definir TTL** para chaves
+- **Prefixo obrigatório**: `tenantId:domínio:identificador`
+- **Não armazenar dados sensíveis** no cache
+- **Invalidar cache em updates/deletes**
+
+```typescript
+// Cliente Redis com prefixo de tenant
+export class TenantRedisClient {
+  constructor(
+    private redis: Redis,
+    private tenantId: string
+  ) {}
+  
+  private getKey(domain: string, identifier: string): string {
+    return `${this.tenantId}:${domain}:${identifier}`;
+  }
+  
+  async set(
+    domain: string, 
+    identifier: string, 
+    value: any, 
+    ttl: number = 3600
+  ): Promise<void> {
+    const key = this.getKey(domain, identifier);
+    await this.redis.setex(key, ttl, JSON.stringify(value));
+  }
+  
+  async get<T>(domain: string, identifier: string): Promise<T | null> {
+    const key = this.getKey(domain, identifier);
+    const value = await this.redis.get(key);
+    return value ? JSON.parse(value) : null;
+  }
+  
+  async invalidate(domain: string, pattern: string = '*'): Promise<void> {
+    const keyPattern = this.getKey(domain, pattern);
+    const keys = await this.redis.keys(keyPattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+  }
+}
+
+// Exemplo de uso
+const redisClient = new TenantRedisClient(redis, tenantId);
+
+// Cache de usuário por 1 hora
+await redisClient.set('user', userId, userData, 3600);
+
+// Buscar usuário do cache
+const cachedUser = await redisClient.get<User>('user', userId);
+
+// Invalidar cache ao atualizar usuário
+await redisClient.invalidate('user', userId);
+```
+
+## 🔄 N8N (Automação)
+- **Usar apenas para processos não críticos**
+- **Webhooks sempre com autenticação**
+- **Workflows exportados e versionados** em `/integrations/n8n/`
+- **Documentar triggers e dependências**
+
+### Webhook Seguro para N8N
+```typescript
+// n8n.webhook.ts
+import { Request, Response } from 'express';
+import { createHmac } from 'crypto';
+
+export const n8nWebhook = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Verificar assinatura HMAC
+    const signature = req.headers['x-n8n-signature'] as string;
+    const payload = JSON.stringify(req.body);
+    const expectedSignature = createHmac('sha256', process.env.N8N_WEBHOOK_SECRET!)
+      .update(payload)
+      .digest('hex');
+    
+    if (signature !== expectedSignature) {
+      res.status(401).json({ error: 'Invalid signature' });
+      return;
+    }
+    
+    const { tenantId, event, data } = req.body;
+    
+    if (!tenantId) {
+      res.status(400).json({ error: 'tenantId is required' });
+      return;
+    }
+    
+    // Log da automação
+    logger.info('n8n_webhook_triggered', {
+      tenantId,
+      event,
+      dataShape: Object.keys(data || {}),
+      workflowId: req.headers['x-n8n-workflow-id']
+    }, { 
+      tenantId, 
+      requestId: req.headers['x-request-id'] as string 
+    });
+    
+    // Processar evento
+    await processN8NEvent(tenantId, event, data);
+    
+    res.json({ success: true, processedAt: new Date().toISOString() });
+  } catch (error) {
+    logger.error('n8n_webhook_error', error as Error, {
+      tenantId: req.body.tenantId,
+      requestId: req.headers['x-request-id'] as string
+    });
+    
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+async function processN8NEvent(tenantId: string, event: string, data: any): Promise<void> {
+  // Implementar lógica específica do evento
+  switch (event) {
+    case 'user.created':
+      await handleUserCreated(tenantId, data);
+      break;
+    case 'order.completed':
+      await handleOrderCompleted(tenantId, data);
+      break;
+    default:
+      logger.warn('unknown_n8n_event', { event, tenantId });
+  }
+}
+```
+
+### Versionamento de Workflows
+```json
+// /integrations/n8n/user-created-workflow.json
+{
+  "name": "User Created Workflow",
+  "version": "1.2.0",
+  "description": "Processa criação de usuário e envia email de boas-vindas",
+  "tenantId": "required",
+  "triggers": [
+    {
+      "type": "webhook",
+      "endpoint": "/api/n8n/user-created",
+      "method": "POST",
+      "authentication": "HMAC-SHA256"
+    }
+  ],
+  "steps": [
+    {
+      "name": "Validate Tenant",
+      "type": "function",
+      "code": "if (!data.tenantId) throw new Error('tenantId required')"
+    },
+    {
+      "name": "Send Welcome Email",
+      "type": "http",
+      "url": "{{$env.EMAIL_SERVICE_URL}}/send-welcome",
+      "headers": {
+        "Authorization": "Bearer {{$env.EMAIL_SERVICE_TOKEN}}",
+        "X-Tenant-ID": "{{data.tenantId}}"
+      }
+    }
+  ],
+  "errorHandling": {
+    "retry": 3,
+    "fallback": "log_error"
+  }
+}
+```
+
+### Configuração de Deploy
+```yaml
+# .github/workflows/n8n-deploy.yml
+name: Deploy N8N Workflows
+
+on:
+  push:
+    paths:
+      - 'integrations/n8n/**'
+
+jobs:
+  deploy-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy to N8N
+        run: |
+          for workflow in integrations/n8n/*.json; do
+            n8n import:workflow --file="$workflow" --overwrite
+          done
+        env:
+          N8N_API_URL: ${{ secrets.N8N_API_URL }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+```
+
+## 📝 Notion
+- **Usado apenas para PRDs e documentação funcional**
+- **Nunca armazenar credenciais** em páginas do Notion
+- **API do Notion apenas para dados não sensíveis**
+- **Sempre mapear conteúdo por `tenantId`**
+
+### Cliente Notion Avançado
+```typescript
+// notion.client.ts
+import { Client } from '@notionhq/client';
+
+interface NotionPage {
+  id: string;
+  title: string;
+  tenantId: string;
+  status: 'draft' | 'review' | 'approved';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export class NotionClient {
+  private notion: Client;
+  
+  constructor(
+    private tenantId: string,
+    private databaseId: string
+  ) {
+    this.notion = new Client({
+      auth: process.env.NOTION_API_KEY!
+    });
+  }
+  
+  async createPRD(
+    title: string, 
+    content: any, 
+    metadata: Record<string, any> = {}
+  ): Promise<string> {
+    try {
+      const response = await this.notion.pages.create({
+        parent: { database_id: this.databaseId },
+        properties: {
+          title: { 
+            title: [{ text: { content: title } }] 
+          },
+          tenant: { 
+            select: { name: this.tenantId } 
+          },
+          status: { 
+            select: { name: 'Draft' } 
+          },
+          created_at: {
+            date: { start: new Date().toISOString() }
+          },
+          ...metadata
+        },
+        children: this.formatContent(content)
+      });
+      
+      logger.info('notion_prd_created', {
+        pageId: response.id,
+        title,
+        tenantId: this.tenantId
+      }, { tenantId: this.tenantId, requestId: crypto.randomUUID() });
+      
+      return response.id;
+    } catch (error) {
+      logger.error('notion_prd_creation_failed', error as Error, {
+        tenantId: this.tenantId,
+        title
+      });
+      throw error;
+    }
+  }
+  
+  async getPRDs(status?: string): Promise<NotionPage[]> {
+    const filter: any = {
+      property: 'tenant',
+      select: { equals: this.tenantId }
+    };
+    
+    if (status) {
+      filter.and = [
+        {
+          property: 'status',
+          select: { equals: status }
+        }
+      ];
+    }
+    
+    const response = await this.notion.databases.query({
+      database_id: this.databaseId,
+      filter
+    });
+    
+    return response.results.map(page => this.mapPageToNotionPage(page));
+  }
+  
+  async updatePRD(pageId: string, updates: Partial<NotionPage>): Promise<void> {
+    const properties: any = {};
+    
+    if (updates.title) {
+      properties.title = { title: [{ text: { content: updates.title } }] };
+    }
+    
+    if (updates.status) {
+      properties.status = { select: { name: updates.status } };
+    }
+    
+    await this.notion.pages.update({
+      page_id: pageId,
+      properties
+    });
+    
+    logger.info('notion_prd_updated', {
+      pageId,
+      updates,
+      tenantId: this.tenantId
+    }, { tenantId: this.tenantId, requestId: crypto.randomUUID() });
+  }
+  
+  private formatContent(content: any): any[] {
+    // Converter markdown para blocos do Notion
+    return content.map((block: any) => ({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [{ text: { content: block } }]
+      }
+    }));
+  }
+  
+  private mapPageToNotionPage(page: any): NotionPage {
+    return {
+      id: page.id,
+      title: page.properties.title.title[0]?.text.content || '',
+      tenantId: page.properties.tenant.select.name,
+      status: page.properties.status.select.name.toLowerCase(),
+      createdAt: page.properties.created_at.date.start,
+      updatedAt: page.last_edited_time
+    };
+  }
+}
+```
+
+### Configuração do Banco de Dados
+```sql
+-- Estrutura da tabela de PRDs no Notion
+-- Database: PRDs
+-- Properties:
+-- - Title (Title)
+-- - Tenant (Select) - valores: tenant-1, tenant-2, etc.
+-- - Status (Select) - valores: Draft, Review, Approved
+-- - Created At (Date)
+-- - Updated At (Last edited time)
+-- - Author (Person)
+-- - Priority (Select) - valores: High, Medium, Low
+```
+
+## 📂 Google Drive
+- **Usado apenas para assets/documentos não sensíveis**
+- **Dados críticos não podem ser armazenados** no Drive
+- **Acesso sempre restrito a grupos**, nunca link público
+- **APIs só com credenciais seguras** no Vault
+
+### Cliente Google Drive Avançado
+```typescript
+// google-drive.client.ts
+import { drive_v3, google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
+
+interface DriveAsset {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  webViewLink: string;
+  tenantId: string;
+  uploadedAt: string;
+}
+
+export class GoogleDriveClient {
+  private drive: drive_v3.Drive;
+  private auth: OAuth2Client;
+  
+  constructor(private tenantId: string) {
+    this.auth = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+    
+    this.auth.setCredentials({
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+    });
+    
+    this.drive = google.drive({ version: 'v3', auth: this.auth });
+  }
+  
+  async uploadAsset(
+    file: Buffer, 
+    fileName: string, 
+    mimeType: string,
+    metadata: Record<string, any> = {}
+  ): Promise<DriveAsset> {
+    try {
+      const folderId = await this.getTenantFolder();
+      const sanitizedFileName = this.sanitizeFileName(fileName);
+      
+      const response = await this.drive.files.create({
+        requestBody: {
+          name: `${this.tenantId}-${sanitizedFileName}`,
+          parents: [folderId],
+          description: `Asset for tenant ${this.tenantId}`,
+          ...metadata
+        },
+        media: {
+          mimeType,
+          body: file
+        }
+      });
+      
+      const fileId = response.data.id!;
+      
+      // Configurar permissões restritas
+      await this.setRestrictivePermissions(fileId);
+      
+      // Obter link de visualização
+      const fileDetails = await this.drive.files.get({
+        fileId,
+        fields: 'id,name,mimeType,size,webViewLink,createdTime'
+      });
+      
+      const asset: DriveAsset = {
+        id: fileId,
+        name: fileDetails.data.name!,
+        mimeType: fileDetails.data.mimeType!,
+        size: parseInt(fileDetails.data.size || '0'),
+        webViewLink: fileDetails.data.webViewLink!,
+        tenantId: this.tenantId,
+        uploadedAt: fileDetails.data.createdTime!
+      };
+      
+      logger.info('google_drive_asset_uploaded', {
+        fileId,
+        fileName: sanitizedFileName,
+        mimeType,
+        size: asset.size,
+        tenantId: this.tenantId
+      }, { tenantId: this.tenantId, requestId: crypto.randomUUID() });
+      
+      return asset;
+    } catch (error) {
+      logger.error('google_drive_upload_failed', error as Error, {
+        fileName,
+        tenantId: this.tenantId
+      });
+      throw error;
+    }
+  }
+  
+  async getAssets(folderId?: string): Promise<DriveAsset[]> {
+    const query = folderId 
+      ? `'${folderId}' in parents and trashed=false`
+      : `'${await this.getTenantFolder()}' in parents and trashed=false`;
+    
+    const response = await this.drive.files.list({
+      q: query,
+      fields: 'files(id,name,mimeType,size,webViewLink,createdTime)',
+      orderBy: 'createdTime desc'
+    });
+    
+    return response.data.files?.map(file => ({
+      id: file.id!,
+      name: file.name!,
+      mimeType: file.mimeType!,
+      size: parseInt(file.size || '0'),
+      webViewLink: file.webViewLink!,
+      tenantId: this.tenantId,
+      uploadedAt: file.createdTime!
+    })) || [];
+  }
+  
+  async deleteAsset(fileId: string): Promise<void> {
+    await this.drive.files.delete({ fileId });
+    
+    logger.info('google_drive_asset_deleted', {
+      fileId,
+      tenantId: this.tenantId
+    }, { tenantId: this.tenantId, requestId: crypto.randomUUID() });
+  }
+  
+  private async getTenantFolder(): Promise<string> {
+    const folderName = `tenant-${this.tenantId}`;
+    
+    // Buscar pasta existente
+    const response = await this.drive.files.list({
+      q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    });
+    
+    if (response.data.files?.length) {
+      return response.data.files[0].id!;
+    }
+    
+    // Criar pasta se não existir
+    const folder = await this.drive.files.create({
+      requestBody: {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder',
+        description: `Assets folder for tenant ${this.tenantId}`
+      }
+    });
+    
+    const folderId = folder.data.id!;
+    
+    // Configurar permissões restritas na pasta
+    await this.setRestrictivePermissions(folderId);
+    
+    return folderId;
+  }
+  
+  private async setRestrictivePermissions(fileId: string): Promise<void> {
+    // Remover permissão pública
+    await this.drive.permissions.delete({
+      fileId,
+      permissionId: 'anyone'
+    }).catch(() => {}); // Ignorar se não existir
+    
+    // Adicionar permissão apenas para grupo do tenant
+    await this.drive.permissions.create({
+      fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'group',
+        emailAddress: `${this.tenantId}@company.com`
+      }
+    });
+  }
+  
+  private sanitizeFileName(fileName: string): string {
+    // Remover caracteres perigosos e limitar tamanho
+    return fileName
+      .replace(/[^a-zA-Z0-9.-]/g, '_')
+      .substring(0, 100);
+  }
+}
+```
+
+### Configuração de Credenciais
+```json
+// google-credentials.json (nunca commitar)
+{
+  "type": "service_account",
+  "project_id": "your-project",
+  "private_key_id": "key-id",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+  "client_email": "service-account@your-project.iam.gserviceaccount.com",
+  "client_id": "client-id",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token"
+}
+```
+
+## ✅ Checklist Score 10
+
+### Deploy e CI/CD
+- [ ] **Deploys apenas via Vercel**, com previews em PRs
+- [ ] **Variáveis de ambiente** configuradas no painel da Vercel
+- [ ] **Branch protection** ativado para main
+
+### Supabase
+- [ ] **RLS habilitado** em todas as tabelas
+- [ ] **Migrations versionadas** com `supabase migration new`
+- [ ] **Queries filtram por `tenantId`**
+- [ ] **Storage com buckets separados** por tenant
+
+### Autenticação
+- [ ] **JWT obrigatório** em rotas protegidas
+- [ ] **`tenantId` associado** ao usuário autenticado
+- [ ] **MFA habilitado** quando suportado
+- [ ] **Sessões revogadas** no logout
+
+### Logs e Monitoramento
+- [ ] **Logs estruturados** no Supabaselogs
+- [ ] **PII sensível mascarada** em logs
+- [ ] **Performance monitorada** (p95, p99)
+- [ ] **Erros críticos registrados**
+
+### Cache e Performance
+- [ ] **Redis com TTL** definido para todas as chaves
+- [ ] **Prefixos de tenant** em todas as chaves
+- [ ] **Cache invalidado** em updates/deletes
+- [ ] **Dados sensíveis não armazenados** no cache
+
+### Integrações Externas
+- [ ] **Workflows do N8N versionados** em `/integrations/n8n/`
+- [ ] **Webhooks com autenticação** obrigatória
+- [ ] **Notion usado só para docs/PRDs**, sem credenciais
+- [ ] **Google Drive apenas para assets** não sensíveis
+
+### Segurança
+- [ ] **Credenciais no Vault** ou `.env`
+- [ ] **Acesso restrito** a grupos no Google Drive
+- [ ] **APIs com autenticação** adequada
+- [ ] **Documentação atualizada** em `/docs/integrations.md`
+
+## 🔒 Auditoria de Dependências
+
+### Ferramentas Obrigatórias
+- **npm audit** para vulnerabilidades conhecidas
+- **Snyk** para scanning contínuo
+- **Dependabot** para atualizações automáticas
+- **Renovate** para gerenciamento de dependências
+
+```json
+// package.json - Scripts de auditoria
+{
+  "scripts": {
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix",
+    "audit:ci": "npm audit --audit-level moderate",
+    "check-updates": "npm outdated",
+    "security:scan": "snyk test",
+    "security:monitor": "snyk monitor"
+  }
+}
+```
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "security-team"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+```
+
+### Configuração Snyk
+```bash
+# Instalar Snyk
+npm install -g snyk
+
+# Autenticar
+snyk auth
+
+# Testar vulnerabilidades
+snyk test
+
+# Monitorar projeto
+snyk monitor
+```
+
+## 📈 Observabilidade Avançada
+
+### OpenTelemetry Integration
+```typescript
+// tracing.config.ts
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { Resource } from '@opentelemetry/resources';
+import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+
+const sdk = new NodeSDK({
+  resource: new Resource({
+    [SemanticResourceAttributes.SERVICE_NAME]: 'app-gestao-pessoal',
+    [SemanticResourceAttributes.SERVICE_VERSION]: process.env.SERVICE_VERSION || '1.0.0',
+    [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || 'development',
+  }),
+  instrumentations: [getNodeAutoInstrumentations()],
+});
+
+sdk.start();
+```
+
+### Métricas Customizadas
+```typescript
+// metrics.service.ts
+import { MeterProvider, MetricReader } from '@opentelemetry/sdk-metrics';
+
+export class MetricsService {
+  private meter: any;
+  
+  constructor() {
+    this.meter = new MeterProvider().getMeter('app-gestao-pessoal');
+  }
+  
+  recordUserAction(tenantId: string, action: string): void {
+    const counter = this.meter.createCounter('user_actions_total', {
+      description: 'Total number of user actions',
+    });
+    
+    counter.add(1, { tenantId, action });
+  }
+  
+  recordApiLatency(tenantId: string, endpoint: string, duration: number): void {
+    const histogram = this.meter.createHistogram('api_request_duration_ms', {
+      description: 'API request duration in milliseconds',
+    });
+    
+    histogram.record(duration, { tenantId, endpoint });
+  }
+}
+```
+
+## 🚀 Score 10 - Integrações Completas
+
+### Características do Score 10
+- ✅ **Exemplos práticos** para todas as integrações
+- ✅ **Configurações completas** (Vercel, Supabase, Redis, N8N, Notion, Drive)
+- ✅ **Segurança rigorosa** com auditoria de dependências
+- ✅ **Observabilidade avançada** com OpenTelemetry
+- ✅ **Logs estruturados** com sanitização de dados sensíveis
+- ✅ **Multi-tenancy** com `tenantId` em todas as operações
+- ✅ **Versionamento** de workflows e configurações
+- ✅ **CI/CD** integrado para todas as ferramentas

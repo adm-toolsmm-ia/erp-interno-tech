@@ -1,0 +1,417 @@
+---
+alwaysApply: true
+description: "Diretrizes de segurança para desenvolvimento"
+---
+
+# 🔒 Diretrizes de Segurança
+
+## Autenticação e Autorização
+- **Sempre validar tokens JWT** em rotas protegidas
+- **Implemente rate limiting** para APIs públicas
+- **Use HTTPS** em produção sempre
+- **Valide permissões** em cada operação sensível
+- **Implemente logout seguro** com invalidação de tokens
+
+## Validação de Dados
+- **Valide TODOS os inputs** do usuário
+- **Use sanitização** para prevenir XSS
+- **Implemente validação server-side** mesmo com validação client-side
+- **Use whitelist** em vez de blacklist para validação
+- **Valide tipos e formatos** de dados
+
+## Gerenciamento de Secrets
+- **NUNCA commite secrets** no código
+- **Use variáveis de ambiente** para configurações sensíveis
+- **Implemente rotação de secrets** regularmente
+- **Use vaults de secrets** em produção
+- **Nunca logue informações sensíveis**
+
+## Segurança de APIs
+- **Implemente CORS** adequadamente
+- **Use headers de segurança** (HSTS, CSP, etc.)
+- **Valide Content-Type** das requisições
+- **Implemente timeout** para requisições
+- **Use HTTPS** para todas as comunicações
+
+## Tratamento de Erros Seguro
+- **Nunca exponha stack traces** em produção
+- **Logue erros** sem expor informações sensíveis
+- **Use códigos de erro padronizados**
+- **Implemente monitoramento** de tentativas de acesso suspeitas
+
+## Dados Sensíveis
+- **Criptografe dados sensíveis** em repouso
+- **Use hash com salt** para senhas
+- **Implemente PII masking** em logs
+- **Siga LGPD/GDPR** para dados pessoais
+- **Implemente auditoria** de acesso a dados sensíveis
+
+## OWASP Top 10 Compliance
+
+### 1. Broken Access Control
+- **Implemente autorização** em todas as rotas
+- **Valide permissões** em cada operação
+- **Use princípio do menor privilégio**
+- **Teste cenários de acesso** não autorizado
+
+```typescript
+// ✅ Controle de acesso baseado em roles
+@Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class UsersController {
+  @Get(':id')
+  @Roles('admin', 'user')
+  @UseInterceptors(OwnershipGuard)
+  async getUser(@Param('id') id: string, @Request() req) {
+    // Apenas admin ou o próprio usuário pode acessar
+    return this.usersService.findById(id);
+  }
+}
+
+// ✅ Middleware de autorização
+export const RolesGuard = (roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const userRoles = req.user?.roles || [];
+    const hasRole = roles.some(role => userRoles.includes(role));
+    
+    if (!hasRole) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    next();
+  };
+};
+
+// ✅ Verificação de propriedade
+export const OwnershipGuard = (req: Request, res: Response, next: NextFunction) => {
+  const userId = req.params.id;
+  const currentUserId = req.user?.id;
+  const userRole = req.user?.role;
+  
+  if (userRole !== 'admin' && userId !== currentUserId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  next();
+};
+```
+
+### 2. Cryptographic Failures
+- **Use HTTPS** sempre em produção
+- **Criptografe dados sensíveis** com algoritmos seguros
+- **Gere chaves** com entropia suficiente
+- **Rotacione chaves** regularmente
+
+```typescript
+// ✅ Criptografia segura para dados sensíveis
+import crypto from 'crypto';
+
+export class EncryptionService {
+  private readonly algorithm = 'aes-256-gcm';
+  private readonly keyLength = 32;
+  
+  encrypt(text: string): string {
+    const key = crypto.randomBytes(this.keyLength);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipher(this.algorithm, key);
+    
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    return `${key.toString('hex')}:${iv.toString('hex')}:${encrypted}`;
+  }
+  
+  decrypt(encryptedText: string): string {
+    const [keyHex, ivHex, encrypted] = encryptedText.split(':');
+    const key = Buffer.from(keyHex, 'hex');
+    const iv = Buffer.from(ivHex, 'hex');
+    
+    const decipher = crypto.createDecipher(this.algorithm, key);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  }
+}
+
+// ✅ Hash seguro para senhas
+import bcrypt from 'bcrypt';
+
+export class PasswordService {
+  private readonly saltRounds = 12;
+  
+  async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, this.saltRounds);
+  }
+  
+  async verifyPassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
+}
+```
+
+### 3. Injection
+- **Use prepared statements** para SQL
+- **Valide e sanitize** todos os inputs
+- **Use ORM** com proteção contra injection
+- **Implemente whitelist** para validação
+
+```typescript
+// ✅ Proteção contra SQL Injection com TypeORM
+@Injectable()
+export class UserService {
+  async findUserByEmail(email: string): Promise<User> {
+    // TypeORM protege automaticamente contra SQL injection
+    return this.userRepository.findOne({
+      where: { email: email }
+    });
+  }
+}
+
+// ✅ Validação e sanitização de entrada
+import { IsEmail, IsString, Length, Matches } from 'class-validator';
+
+export class CreateUserDto {
+  @IsEmail()
+  @IsString()
+  email: string;
+  
+  @IsString()
+  @Length(8, 50)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+    message: 'Password must contain uppercase, lowercase, number and special character'
+  })
+  password: string;
+}
+
+// ✅ Sanitização de HTML
+import DOMPurify from 'isomorphic-dompurify';
+
+export class InputSanitizer {
+  static sanitizeHTML(input: string): string {
+    return DOMPurify.sanitize(input, {
+      ALLOWED_TAGS: ['b', 'i', 'em', 'strong'],
+      ALLOWED_ATTR: []
+    });
+  }
+  
+  static sanitizeSQL(input: string): string {
+    return input
+      .replace(/[';--]/g, '') // Remove caracteres perigosos
+      .replace(/union/gi, '') // Remove UNION
+      .replace(/select/gi, '') // Remove SELECT
+      .trim();
+  }
+}
+```
+
+### 4. Insecure Design
+- **Implemente threat modeling** no design
+- **Use padrões seguros** por padrão
+- **Valide arquitetura** com especialistas
+- **Documente decisões** de segurança
+
+```typescript
+// ✅ Rate limiting para prevenir ataques
+import rateLimit from 'express-rate-limit';
+
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // máximo 5 tentativas por IP
+  message: 'Too many login attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ✅ Validação de entrada rigorosa
+export class InputValidator {
+  static validateEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email) && email.length <= 254;
+  }
+  
+  static sanitizeInput(input: string): string {
+    return input
+      .replace(/[<>]/g, '') // Remove caracteres perigosos
+      .trim()
+      .substring(0, 1000); // Limita tamanho
+  }
+}
+```
+
+### 5. Security Misconfiguration
+- **Desabilite recursos** desnecessários
+- **Configure headers** de segurança
+- **Use HTTPS** em todos os ambientes
+- **Monitore configurações** regularmente
+
+```typescript
+// ✅ Exemplo de headers de segurança
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+```
+
+### 6. Vulnerable and Outdated Components
+- **Audite dependências** regularmente
+- **Mantenha bibliotecas** atualizadas
+- **Use ferramentas** de scanning automático
+- **Monitore CVE** para vulnerabilidades
+
+```json
+// package.json - Scripts de auditoria
+{
+  "scripts": {
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix",
+    "audit:ci": "npm audit --audit-level moderate",
+    "check-updates": "npm outdated"
+  }
+}
+```
+
+### 7. Identification and Authentication Failures
+- **Implemente MFA** quando possível
+- **Use rate limiting** para autenticação
+- **Proteja contra** ataques de força bruta
+- **Implemente logout** seguro
+
+```typescript
+// ✅ MFA obrigatório para usuários críticos
+export class MFAService {
+  async enableMFA(userId: string): Promise<{ qrCode: string; secret: string }> {
+    const secret = speakeasy.generateSecret({
+      name: `App Gestão Pessoal (${userId})`,
+      issuer: 'App Gestão Pessoal'
+    });
+    
+    await this.userRepository.update(userId, {
+      mfaSecret: secret.base32,
+      mfaEnabled: true
+    });
+    
+    return {
+      qrCode: secret.otpauth_url,
+      secret: secret.base32
+    };
+  }
+  
+  async verifyMFA(userId: string, token: string): Promise<boolean> {
+    const user = await this.userRepository.findById(userId);
+    if (!user?.mfaSecret) return false;
+    
+    return speakeasy.totp.verify({
+      secret: user.mfaSecret,
+      encoding: 'base32',
+      token: token,
+      window: 2
+    });
+  }
+}
+
+// ✅ Rate limiting para autenticação
+@Controller('auth')
+export class AuthController {
+  @Post('login')
+  @UseGuards(ThrottlerGuard)
+  @Throttle(5, 60) // 5 tentativas por minuto
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
+  }
+}
+```
+
+### 8. Software and Data Integrity Failures
+- **Valide integridade** de dados
+- **Use checksums** para arquivos
+- **Implemente assinatura digital** quando necessário
+- **Monitore alterações** não autorizadas
+
+### 9. Security Logging and Monitoring Failures
+- **Implemente logging** de segurança
+- **Monitore tentativas** de acesso suspeitas
+- **Configure alertas** para eventos críticos
+- **Mantenha logs** por período adequado
+
+```typescript
+// ✅ Exemplo de logging de segurança
+@Injectable()
+export class SecurityLogger {
+  logFailedLogin(ip: string, email: string): void {
+    logger.warn('Failed login attempt', {
+      ip,
+      email,
+      timestamp: new Date().toISOString(),
+      event: 'AUTH_FAILED'
+    });
+  }
+  
+  logSuspiciousActivity(userId: string, activity: string): void {
+    logger.error('Suspicious activity detected', {
+      userId,
+      activity,
+      timestamp: new Date().toISOString(),
+      event: 'SUSPICIOUS_ACTIVITY'
+    });
+  }
+}
+```
+
+### 10. Server-Side Request Forgery (SSRF)
+- **Valide URLs** de entrada
+- **Use whitelist** de domínios permitidos
+- **Implemente timeouts** para requests externos
+- **Monitore requests** para domínios externos
+
+## Auditoria de Dependências
+
+### Ferramentas Obrigatórias
+- **npm audit** para vulnerabilidades conhecidas
+- **Snyk** para scanning contínuo
+- **Dependabot** para atualizações automáticas
+- **Renovate** para gerenciamento de dependências
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "security-team"
+```
+
+### Checklist de Segurança
+
+#### Configuração Inicial
+- [ ] **OWASP Top 10** mapeado e mitigado
+- [ ] **Headers de segurança** configurados
+- [ ] **HTTPS** habilitado em todos os ambientes
+- [ ] **Rate limiting** implementado
+
+#### Desenvolvimento
+- [ ] **Validação de entrada** em todas as APIs
+- [ ] **Autorização** verificada em cada operação
+- [ ] **Logs de segurança** implementados
+- [ ] **Dados sensíveis** mascarados em logs
+
+#### Deploy e Monitoramento
+- [ ] **Auditoria de dependências** automatizada
+- [ ] **Scanning de vulnerabilidades** no CI/CD
+- [ ] **Monitoramento** de tentativas de ataque
+- [ ] **Plano de resposta** a incidentes definido

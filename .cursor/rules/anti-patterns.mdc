@@ -1,0 +1,288 @@
+---
+alwaysApply: true
+description: "Anti-padrões e armadilhas comuns a evitar"
+---
+
+# 🚫 Anti-Padrões e Armadilhas Comuns
+
+## Prompts e Implementação
+- ❌ **Prompts gigantes** → código acoplado e sem revisão
+  ✅ **Sempre dividir em PRD → Arquitetura → Implementação**
+
+- ❌ **Funcionalidades múltiplas no mesmo PR**
+  ✅ **Garantir ciclo uma funcionalidade por vez**
+
+- ❌ **Ignorar padrões já existentes**
+  ✅ **Validar arquitetura e metodologias antes de codar**
+
+## Código e Estrutura
+- ❌ **Arquivos muito longos** (>300 linhas)
+  ✅ **Dividir em arquivos menores e mais focados**
+
+- ❌ **Funções muito longas** (>50 linhas)
+  ✅ **Dividir em funções menores com responsabilidade única**
+
+- ❌ **Duplicação de código**
+  ✅ **Verificar se já existe funcionalidade similar e reutilizar**
+
+- ❌ **Scripts em arquivos de código**
+  ✅ **Usar scripts separados ou ferramentas apropriadas**
+
+## Dados e Ambiente
+- ❌ **Dados simulados em dev/prod**
+  ✅ **Usar dados simulados apenas para testes**
+
+- ❌ **Sobrescrever .env sem confirmação**
+  ✅ **Sempre perguntar antes de modificar arquivos de configuração**
+
+- ❌ **Hardcoded values**
+  ✅ **Usar variáveis de ambiente e constantes configuráveis**
+
+## Segurança e Qualidade
+- ❌ **Expor informações sensíveis em logs**
+  ✅ **Implementar masking e sanitização de dados sensíveis**
+
+- ❌ **Validação apenas no frontend**
+  ✅ **Sempre validar no backend também**
+
+- ❌ **Commits de secrets**
+  ✅ **Usar .gitignore e variáveis de ambiente**
+
+## Manutenibilidade
+- ❌ **Código acoplado**
+  ✅ **Seguir princípios SOLID e injeção de dependência**
+
+- ❌ **Comentários desnecessários**
+  ✅ **Código autoexplicativo com nomes descritivos**
+
+- ❌ **Mudanças não relacionadas no mesmo commit**
+  ✅ **Commits atômicos com uma mudança por vez**
+
+## Exemplos de Correção de Anti-Padrões
+
+### 1. Arquivo Muito Longo
+
+#### ❌ Antes (arquivo com 400+ linhas)
+```typescript
+// user-service.ts - 450 linhas
+export class UserService {
+  // 50+ métodos misturados
+  async createUser() { /* ... */ }
+  async updateUser() { /* ... */ }
+  async deleteUser() { /* ... */ }
+  async validateEmail() { /* ... */ }
+  async sendEmail() { /* ... */ }
+  async logActivity() { /* ... */ }
+  // ... mais 40+ métodos
+}
+```
+
+#### ✅ Depois (arquivos separados por responsabilidade)
+```typescript
+// user.service.ts - 80 linhas
+export class UserService {
+  async createUser() { /* ... */ }
+  async updateUser() { /* ... */ }
+  async deleteUser() { /* ... */ }
+}
+
+// email.service.ts - 60 linhas
+export class EmailService {
+  async sendEmail() { /* ... */ }
+  async validateEmail() { /* ... */ }
+}
+
+// activity-logger.service.ts - 50 linhas
+export class ActivityLoggerService {
+  async logActivity() { /* ... */ }
+}
+```
+
+### 2. Função Muito Longa
+
+#### ❌ Antes (função com 80+ linhas)
+```typescript
+async processUserRegistration(userData: any) {
+  // Validação
+  if (!userData.email) throw new Error('Email required');
+  if (!userData.password) throw new Error('Password required');
+  if (userData.password.length < 8) throw new Error('Password too short');
+  
+  // Verificação de duplicata
+  const existingUser = await this.userRepository.findByEmail(userData.email);
+  if (existingUser) throw new Error('User already exists');
+  
+  // Hash da senha
+  const hashedPassword = await bcrypt.hash(userData.password, 10);
+  
+  // Criação do usuário
+  const user = await this.userRepository.create({
+    ...userData,
+    password: hashedPassword
+  });
+  
+  // Envio de email
+  await this.emailService.sendWelcomeEmail(user.email);
+  
+  // Log da atividade
+  await this.activityLogger.log('USER_CREATED', user.id);
+  
+  // Retorno
+  return user;
+}
+```
+
+#### ✅ Depois (funções menores com responsabilidade única)
+```typescript
+async processUserRegistration(userData: CreateUserDto): Promise<User> {
+  this.validateUserData(userData);
+  await this.checkUserExists(userData.email);
+  
+  const hashedPassword = await this.hashPassword(userData.password);
+  const user = await this.createUser({ ...userData, password: hashedPassword });
+  
+  await this.sendWelcomeEmail(user.email);
+  await this.logUserCreation(user.id);
+  
+  return user;
+}
+
+private validateUserData(userData: CreateUserDto): void {
+  if (!userData.email) throw new ValidationError('Email required');
+  if (!userData.password) throw new ValidationError('Password required');
+  if (userData.password.length < 8) throw new ValidationError('Password too short');
+}
+
+private async checkUserExists(email: string): Promise<void> {
+  const existingUser = await this.userRepository.findByEmail(email);
+  if (existingUser) throw new ConflictError('User already exists');
+}
+
+private async hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
+}
+
+private async createUser(userData: CreateUserData): Promise<User> {
+  return this.userRepository.create(userData);
+}
+
+private async sendWelcomeEmail(email: string): Promise<void> {
+  await this.emailService.sendWelcomeEmail(email);
+}
+
+private async logUserCreation(userId: string): Promise<void> {
+  await this.activityLogger.log('USER_CREATED', userId);
+}
+```
+
+### 3. Duplicação de Código
+
+#### ❌ Antes (lógica duplicada)
+```typescript
+// user.controller.ts
+@Post()
+async createUser(@Body() userData: any) {
+  if (!userData.email) throw new Error('Email required');
+  if (!userData.password) throw new Error('Password required');
+  // ... lógica de criação
+}
+
+// admin.controller.ts
+@Post()
+async createAdmin(@Body() adminData: any) {
+  if (!adminData.email) throw new Error('Email required');
+  if (!adminData.password) throw new Error('Password required');
+  // ... lógica similar de criação
+}
+```
+
+#### ✅ Depois (lógica centralizada)
+```typescript
+// validation.service.ts
+export class ValidationService {
+  validateEmail(email: string): void {
+    if (!email) throw new ValidationError('Email required');
+    if (!this.isValidEmailFormat(email)) throw new ValidationError('Invalid email format');
+  }
+  
+  validatePassword(password: string): void {
+    if (!password) throw new ValidationError('Password required');
+    if (password.length < 8) throw new ValidationError('Password too short');
+  }
+  
+  private isValidEmailFormat(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+}
+
+// user.controller.ts
+@Post()
+async createUser(@Body() userData: CreateUserDto) {
+  this.validationService.validateEmail(userData.email);
+  this.validationService.validatePassword(userData.password);
+  return this.userService.create(userData);
+}
+
+// admin.controller.ts
+@Post()
+async createAdmin(@Body() adminData: CreateAdminDto) {
+  this.validationService.validateEmail(adminData.email);
+  this.validationService.validatePassword(adminData.password);
+  return this.adminService.create(adminData);
+}
+```
+
+### 4. Hardcoded Values
+
+#### ❌ Antes (valores fixos no código)
+```typescript
+async sendEmail(to: string, subject: string, body: string) {
+  const transporter = nodemailer.createTransporter({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: 'myapp@gmail.com',
+      pass: 'mypassword123'
+    }
+  });
+  
+  if (body.length > 1000) {
+    throw new Error('Body too long');
+  }
+  
+  // ... resto da lógica
+}
+```
+
+#### ✅ Depois (valores configuráveis)
+```typescript
+// config/email.config.ts
+export const emailConfig = {
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+};
+
+export const emailLimits = {
+  maxBodyLength: parseInt(process.env.EMAIL_MAX_BODY_LENGTH || '1000')
+};
+
+// email.service.ts
+async sendEmail(to: string, subject: string, body: string) {
+  this.validateEmailBody(body);
+  
+  const transporter = nodemailer.createTransporter(emailConfig);
+  // ... resto da lógica
+}
+
+private validateEmailBody(body: string): void {
+  if (body.length > emailLimits.maxBodyLength) {
+    throw new ValidationError('Email body too long');
+  }
+}
+```

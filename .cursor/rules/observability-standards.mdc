@@ -1,0 +1,554 @@
+---
+alwaysApply: true
+description: "Padrões de observabilidade para logs estruturados, tracing distribuído e métricas por tenant"
+---
+
+# 📊 Observabilidade e Monitoramento
+
+## Logs Estruturados Obrigatórios
+
+### Formato JSON Padrão
+```typescript
+// logger.service.ts
+import winston from 'winston';
+import { v4 as uuidv4 } from 'uuid';
+
+interface LogContext {
+  tenantId: string;
+  requestId: string;
+  userId?: string;
+  correlationId?: string;
+  sessionId?: string;
+}
+
+interface StructuredLog {
+  timestamp: string;
+  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+  service: string;
+  version: string;
+  environment: string;
+  tenantId: string;
+  requestId: string;
+  userId?: string;
+  correlationId?: string;
+  sessionId?: string;
+  event: string;
+  message: string;
+  payload: Record<string, any>;
+  metadata: {
+    userAgent?: string;
+    ip?: string;
+    endpoint?: string;
+    method?: string;
+    statusCode?: number;
+    duration?: number;
+    memoryUsage?: NodeJS.MemoryUsage;
+  };
+}
+
+export class StructuredLogger {
+  private logger: winston.Logger;
+
+  constructor(serviceName: string = 'app-gestao-pessoal') {
+    this.logger = winston.createLogger({
+      level: process.env.LOG_LEVEL || 'info',
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.errors({ stack: true }),
+        winston.format.json()
+      ),
+      defaultMeta: {
+        service: serviceName,
+        version: process.env.SERVICE_VERSION || '1.0.0',
+        environment: process.env.NODE_ENV || 'development'
+      },
+      transports: [
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.simple()
+          )
+        }),
+        new winston.transports.File({ 
+          filename: 'logs/error.log', 
+          level: 'error' 
+        }),
+        new winston.transports.File({ 
+          filename: 'logs/combined.log' 
+        })
+      ]
+    });
+  }
+
+  private createLogEntry(
+    level: StructuredLog['level'],
+    event: string,
+    message: string,
+    payload: Record<string, any>,
+    context: LogContext,
+    metadata: Partial<StructuredLog['metadata']> = {}
+  ): StructuredLog {
+    return {
+      timestamp: new Date().toISOString(),
+      level,
+      service: this.logger.defaultMeta?.service || 'app-gestao-pessoal',
+      version: this.logger.defaultMeta?.version || '1.0.0',
+      environment: this.logger.defaultMeta?.environment || 'development',
+      tenantId: context.tenantId,
+      requestId: context.requestId,
+      userId: context.userId,
+      correlationId: context.correlationId,
+      sessionId: context.sessionId,
+      event,
+      message,
+      payload: this.sanitizePayload(payload),
+      metadata: {
+        memoryUsage: process.memoryUsage(),
+        ...metadata
+      }
+    };
+  }
+
+  private sanitizePayload(payload: Record<string, any>): Record<string, any> {
+    const sensitiveKeys = [
+      'password', 'token', 'secret', 'key', 'creditCard', 'ssn', 'cpf',
+      'creditCardNumber', 'cvv', 'pin', 'apiKey', 'privateKey', 'refreshToken'
+    ];
+    
+    return Object.keys(payload).reduce((acc, key) => {
+      const lowerKey = key.toLowerCase();
+      if (sensitiveKeys.some(sensitive => lowerKey.includes(sensitive))) {
+        acc[key] = '[REDACTED]';
+      } else if (typeof payload[key] === 'object' && payload[key] !== null) {
+        acc[key] = this.sanitizePayload(payload[key]);
+      } else {
+        acc[key] = payload[key];
+      }
+      return acc;
+    }, {} as Record<string, any>);
+  }
+
+  info(event: string, message: string, payload: Record<string, any>, context: LogContext, metadata?: Partial<StructuredLog['metadata']>): void {
+    const logEntry = this.createLogEntry('info', event, message, payload, context, metadata);
+    this.logger.info(logEntry);
+  }
+
+  error(event: string, message: string, error: Error, context: LogContext, metadata?: Partial<StructuredLog['metadata']>): void {
+    const logEntry = this.createLogEntry('error', event, message, {
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      },
+      ...payload
+    }, context, metadata);
+    this.logger.error(logEntry);
+  }
+
+  warn(event: string, message: string, payload: Record<string, any>, context: LogContext, metadata?: Partial<StructuredLog['metadata']>): void {
+    const logEntry = this.createLogEntry('warn', event, message, payload, context, metadata);
+    this.logger.warn(logEntry);
+  }
+
+  debug(event: string, message: string, payload: Record<string, any>, context: LogContext, metadata?: Partial<StructuredLog['metadata']>): void {
+    const logEntry = this.createLogEntry('debug', event, message, payload, context, metadata);
+    this.logger.debug(logEntry);
+  }
+}
+```
+
+### Middleware de Logging
+```typescript
+// logging.middleware.ts
+import { Request, Response, NextFunction } from 'express';
+import { v4 as uuidv4 } from 'uuid';
+
+export const loggingMiddleware = (logger: StructuredLogger) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const startTime = Date.now();
+    const requestId = req.headers['x-request-id'] as string || uuidv4();
+    const correlationId = req.headers['x-correlation-id'] as string || uuidv4();
+    
+    // Adicionar IDs ao request
+    req.requestId = requestId;
+    req.correlationId = correlationId;
+    
+    const context: LogContext = {
+      tenantId: req.user?.tenantId || 'unknown',
+      requestId,
+      userId: req.user?.id,
+      correlationId,
+      sessionId: req.sessionID
+    };
+
+    // Log da requisição
+    logger.info('http_request_started', 'HTTP request started', {
+      method: req.method,
+      url: req.url,
+      userAgent: req.get('User-Agent'),
+      ip: req.ip
+    }, context, {
+      endpoint: req.path,
+      method: req.method,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    // Interceptar resposta
+    const originalSend = res.send;
+    res.send = function(data: any) {
+      const duration = Date.now() - startTime;
+      
+      logger.info('http_request_completed', 'HTTP request completed', {
+        statusCode: res.statusCode,
+        duration,
+        responseSize: Buffer.byteLength(data, 'utf8')
+      }, context, {
+        statusCode: res.statusCode,
+        duration,
+        endpoint: req.path,
+        method: req.method
+      });
+
+      return originalSend.call(this, data);
+    };
+
+    next();
+  };
+};
+```
+
+## Tracing Distribuído
+
+### OpenTelemetry Setup
+```typescript
+// tracing.config.ts
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { Resource } from '@opentelemetry/resources';
+import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
+import { ZipkinExporter } from '@opentelemetry/exporter-zipkin';
+
+const sdk = new NodeSDK({
+  resource: new Resource({
+    [SemanticResourceAttributes.SERVICE_NAME]: 'app-gestao-pessoal',
+    [SemanticResourceAttributes.SERVICE_VERSION]: process.env.SERVICE_VERSION || '1.0.0',
+    [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || 'development',
+  }),
+  instrumentations: [getNodeAutoInstrumentations()],
+  traceExporter: new JaegerExporter({
+    endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
+  }),
+});
+
+sdk.start();
+```
+
+### Custom Spans
+```typescript
+// tracing.service.ts
+import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+
+export class TracingService {
+  private tracer = trace.getTracer('app-gestao-pessoal');
+
+  async traceOperation<T>(
+    operationName: string,
+    operation: () => Promise<T>,
+    attributes: Record<string, any> = {}
+  ): Promise<T> {
+    const span = this.tracer.startSpan(operationName, {
+      attributes: {
+        'operation.name': operationName,
+        'tenant.id': attributes.tenantId,
+        'user.id': attributes.userId,
+        ...attributes
+      }
+    });
+
+    try {
+      const result = await context.with(trace.setSpan(context.active(), span), operation);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return result;
+    } catch (error) {
+      span.setStatus({ 
+        code: SpanStatusCode.ERROR, 
+        message: (error as Error).message 
+      });
+      span.recordException(error as Error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+
+  addSpanEvent(eventName: string, attributes: Record<string, any>): void {
+    const span = trace.getActiveSpan();
+    if (span) {
+      span.addEvent(eventName, attributes);
+    }
+  }
+
+  setSpanAttribute(key: string, value: any): void {
+    const span = trace.getActiveSpan();
+    if (span) {
+      span.setAttributes({ [key]: value });
+    }
+  }
+}
+```
+
+## Métricas por Tenant
+
+### Prometheus Metrics
+```typescript
+// metrics.service.ts
+import { register, Counter, Histogram, Gauge } from 'prom-client';
+
+export class MetricsService {
+  private requestCounter: Counter<string>;
+  private requestDuration: Histogram<string>;
+  private activeUsers: Gauge<string>;
+  private errorCounter: Counter<string>;
+
+  constructor() {
+    this.requestCounter = new Counter({
+      name: 'http_requests_total',
+      help: 'Total number of HTTP requests',
+      labelNames: ['method', 'route', 'status_code', 'tenant_id']
+    });
+
+    this.requestDuration = new Histogram({
+      name: 'http_request_duration_seconds',
+      help: 'Duration of HTTP requests in seconds',
+      labelNames: ['method', 'route', 'tenant_id'],
+      buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5, 7, 10]
+    });
+
+    this.activeUsers = new Gauge({
+      name: 'active_users_total',
+      help: 'Number of active users',
+      labelNames: ['tenant_id']
+    });
+
+    this.errorCounter = new Counter({
+      name: 'errors_total',
+      help: 'Total number of errors',
+      labelNames: ['error_type', 'tenant_id', 'service']
+    });
+
+    register.registerMetric(this.requestCounter);
+    register.registerMetric(this.requestDuration);
+    register.registerMetric(this.activeUsers);
+    register.registerMetric(this.errorCounter);
+  }
+
+  recordRequest(method: string, route: string, statusCode: number, tenantId: string, duration: number): void {
+    this.requestCounter.inc({ method, route, status_code: statusCode.toString(), tenant_id: tenantId });
+    this.requestDuration.observe({ method, route, tenant_id: tenantId }, duration / 1000);
+  }
+
+  recordError(errorType: string, tenantId: string, service: string): void {
+    this.errorCounter.inc({ error_type: errorType, tenant_id: tenantId, service });
+  }
+
+  setActiveUsers(tenantId: string, count: number): void {
+    this.activeUsers.set({ tenant_id: tenantId }, count);
+  }
+
+  getMetrics(): Promise<string> {
+    return register.metrics();
+  }
+}
+```
+
+### Health Checks
+```typescript
+// health.service.ts
+export class HealthService {
+  private checks: Map<string, () => Promise<boolean>> = new Map();
+
+  constructor() {
+    this.addCheck('database', this.checkDatabase);
+    this.addCheck('redis', this.checkRedis);
+    this.addCheck('supabase', this.checkSupabase);
+  }
+
+  addCheck(name: string, check: () => Promise<boolean>): void {
+    this.checks.set(name, check);
+  }
+
+  async getHealth(): Promise<{
+    status: 'healthy' | 'unhealthy';
+    checks: Record<string, { status: 'pass' | 'fail'; message?: string }>;
+    timestamp: string;
+  }> {
+    const results: Record<string, { status: 'pass' | 'fail'; message?: string }> = {};
+    let allHealthy = true;
+
+    for (const [name, check] of this.checks) {
+      try {
+        const isHealthy = await check();
+        results[name] = { status: isHealthy ? 'pass' : 'fail' };
+        if (!isHealthy) allHealthy = false;
+      } catch (error) {
+        results[name] = { 
+          status: 'fail', 
+          message: (error as Error).message 
+        };
+        allHealthy = false;
+      }
+    }
+
+    return {
+      status: allHealthy ? 'healthy' : 'unhealthy',
+      checks: results,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  private async checkDatabase(): Promise<boolean> {
+    // Implementar verificação do banco
+    return true;
+  }
+
+  private async checkRedis(): Promise<boolean> {
+    // Implementar verificação do Redis
+    return true;
+  }
+
+  private async checkSupabase(): Promise<boolean> {
+    // Implementar verificação do Supabase
+    return true;
+  }
+}
+```
+
+## Alertas e Monitoramento
+
+### Configuração de Alertas
+```yaml
+# monitoring/alerts.yml
+groups:
+  - name: app-gestao-pessoal
+    rules:
+      - alert: HighErrorRate
+        expr: rate(errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors per second"
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }} seconds"
+
+      - alert: LowMemory
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low memory available"
+          description: "Memory usage is above 90%"
+
+      - alert: DatabaseDown
+        expr: up{job="database"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database is down"
+          description: "Database health check failed"
+```
+
+## Dashboard Grafana
+
+### Configuração de Dashboard
+```json
+{
+  "dashboard": {
+    "title": "App Gestão Pessoal - Multi-Tenant",
+    "panels": [
+      {
+        "title": "Request Rate by Tenant",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m]) by (tenant_id)",
+            "legendFormat": "{{tenant_id}}"
+          }
+        ]
+      },
+      {
+        "title": "Response Time P95",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95 Response Time"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate by Tenant",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(errors_total[5m]) by (tenant_id)",
+            "legendFormat": "{{tenant_id}}"
+          }
+        ]
+      },
+      {
+        "title": "Active Users by Tenant",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "active_users_total",
+            "legendFormat": "Active Users"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## ✅ Checklist Score 10
+
+### Logs Estruturados
+- [ ] **Formato JSON** padronizado implementado
+- [ ] **Sanitização** de dados sensíveis
+- [ ] **Contexto multi-tenant** em todos os logs
+- [ ] **Correlation IDs** para rastreamento
+- [ ] **Níveis de log** apropriados
+
+### Tracing Distribuído
+- [ ] **OpenTelemetry** configurado
+- [ ] **Spans customizados** para operações críticas
+- [ ] **Jaeger/Zipkin** para visualização
+- [ ] **Correlation** entre logs e traces
+- [ ] **Performance** monitorada
+
+### Métricas
+- [ ] **Prometheus** configurado
+- [ ] **Métricas por tenant** implementadas
+- [ ] **Health checks** funcionando
+- [ ] **Alertas** configurados
+- [ ] **Dashboard** Grafana ativo
+
+### Monitoramento
+- [ ] **Uptime** monitorado
+- [ ] **Performance** rastreada
+- [ ] **Erros** alertados
+- [ ] **Recursos** monitorados
+- [ ] **SLA** definido e medido

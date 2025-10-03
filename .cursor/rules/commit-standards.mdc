@@ -1,0 +1,176 @@
+---
+alwaysApply: true
+description: "Padrões de commit e mensagens para histórico limpo e rastreável"
+---
+
+# 📄 Padrões de Commit
+
+## Objetivo
+Padronizar as mensagens de commit para garantir histórico limpo, rastreável e fácil de entender.
+Cada tarefa concluída deve ser registrada em um commit atômico com mensagem clara e estruturada.
+
+## Estrutura dos Commits
+
+### Formato Base
+Cada commit deve começar com um prefixo que indica a natureza da mudança, seguido de uma descrição objetiva:
+
+- **Feat:** para novas funcionalidades
+- **Fix:** para correções de bugs
+- **Refactor:** para melhorias de código que não alteram comportamento
+- **Docs:** para mudanças na documentação
+- **Test:** para criação ou ajustes de testes
+- **Chore:** para tarefas auxiliares ou de manutenção (ex.: atualizar dependências)
+
+### Exemplos Corretos
+```
+Feat: adicionar autenticação JWT no backend
+Fix: corrigir erro de timeout ao salvar pedido
+Refactor: extrair lógica de validação para service separado
+Docs: adicionar guia de setup do ambiente local
+Test: incluir casos de borda para API de autenticação
+Chore: atualizar dependências do Next.js para v14
+```
+
+## Regras de Granularidade
+
+### Um Commit = Uma Tarefa Atômica
+- **NÃO agrupar** várias tarefas diferentes em um único commit
+- Se precisar corrigir algo no meio do desenvolvimento, **preferir separar em commits diferentes**
+- Cada commit deve representar uma mudança lógica completa e funcional
+
+### Descrições Objetivas
+- **Sempre em português**, exceto termos técnicos
+- **Evitar descrições vagas** como "ajustes", "update" ou "alterações"
+- A mensagem deve permitir entender o que foi feito **sem abrir o diff**
+- Use verbos no infinitivo (adicionar, corrigir, refatorar, etc.)
+
+## Qualidade Antes do Commit
+
+### Validações Obrigatórias
+- **Testes devem ser executados** antes de confirmar o commit
+- **O código deve estar compilando** e funcional
+- **Linting deve passar** sem erros
+- **Build deve ser bem-sucedido**
+
+## Checklist Antes de Commitar
+
+- [ ] **Cada commit representa uma única tarefa atômica**
+- [ ] **A mensagem segue o padrão definido** (Feat, Fix, Refactor, Docs, Test, Chore)
+- [ ] **A descrição está clara, objetiva e em português**
+- [ ] **O commit não mistura escopos diferentes**
+- [ ] **Testes foram executados e o código está funcional**
+- [ ] **O histórico do repositório permanece limpo e rastreável**
+
+## Exemplos de Commits Incorretos ❌
+
+```
+// Muito vago
+Update files
+
+// Múltiplas tarefas
+Fix auth and add new feature
+
+// Inglês desnecessário
+Add new user registration
+
+// Sem prefixo
+Corrigir bug de validação
+```
+
+## Exemplos de Commits Corretos ✅
+
+```
+Feat: implementar sistema de notificações push
+Fix: corrigir validação de CPF no formulário
+Refactor: separar lógica de negócio do controller
+Docs: atualizar README com instruções de instalação
+Test: adicionar testes para validação de email
+Chore: atualizar dependências de segurança
+```
+
+## Branch Naming Convention
+
+### Padrão Obrigatório
+Use o formato: `{tipo}/{descrição-curta}`
+
+### Tipos de Branch
+- **feature/**: Novas funcionalidades
+- **fix/**: Correções de bugs
+- **hotfix/**: Correções urgentes em produção
+- **refactor/**: Refatorações de código
+- **docs/**: Mudanças na documentação
+- **test/**: Adição ou correção de testes
+- **chore/**: Tarefas de manutenção
+
+### Exemplos de Nomes de Branch ✅
+```
+feature/user-authentication
+fix/login-validation-error
+hotfix/security-vulnerability
+refactor/extract-validation-service
+docs/api-documentation
+test/add-user-service-tests
+chore/update-dependencies
+```
+
+### Exemplos de Nomes de Branch ❌
+```
+// Muito vago
+feature/updates
+fix/stuff
+
+// Sem tipo
+user-authentication
+login-fix
+
+// Muito longo
+feature/implement-complete-user-authentication-system-with-jwt-tokens
+
+// Caracteres especiais
+feature/user@auth
+fix/login-bug!
+```
+
+## Workflow de Branch
+
+### 1. Criação de Branch
+```bash
+# Sempre partir da main/develop
+git checkout main
+git pull origin main
+git checkout -b feature/user-authentication
+```
+
+### 2. Desenvolvimento
+- **Commits pequenos e frequentes** na branch
+- **Sempre seguir** padrão de mensagem de commit
+- **Push regular** para backup e colaboração
+
+### 3. Pull Request
+- **Título descritivo** seguindo padrão de commit
+- **Descrição detalhada** do que foi implementado
+- **Link para issue** relacionada (se aplicável)
+- **Checklist de validação** preenchido
+
+### 4. Merge Strategy
+- **Squash and merge** para branches de feature
+- **Merge commit** para hotfixes críticos
+- **Rebase** antes do merge para histórico limpo
+
+## Checklist de Branch
+
+### Antes de Criar Branch
+- [ ] **Branch base** está atualizada (main/develop)
+- [ ] **Nome da branch** segue convenção
+- [ ] **Issue/requisito** está bem definido
+
+### Durante Desenvolvimento
+- [ ] **Commits frequentes** e bem descritos
+- [ ] **Branch atualizada** regularmente com base
+- [ ] **Conflitos resolvidos** antes do push
+
+### Antes do Merge
+- [ ] **Todos os testes** passando
+- [ ] **Code review** aprovado
+- [ ] **Branch atualizada** com base
+- [ ] **Pull request** bem documentado

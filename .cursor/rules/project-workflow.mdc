@@ -1,0 +1,181 @@
+---
+alwaysApply: true
+description: "Fluxo de trabalho padrão para desenvolvimento de funcionalidades"
+---
+
+# 🚀 Fluxo de Trabalho Padrão
+
+## Princípio Central
+**Sempre implementar uma única funcionalidade por vez**, passando pelo ciclo:
+**Escopo (PRD) → Arquitetura & Padrões → Implementação isolada → Testes → Validação → Entrega**
+
+## 1. PRD (Product Requirements Document)
+Antes de qualquer implementação, confirmar:
+- Objetivo e impacto da funcionalidade
+- Usuários e casos de uso
+- Fluxo de entrada/saída e estados de erro
+- Restrições funcionais e não-funcionais
+- Critérios de aceite (Given/When/Then)
+
+## 2. Arquitetura & Padrões
+Validar antes de codar:
+- Arquitetura mais adequada (hexagonal, modular, event-driven…)
+- Padrões/metodologias de engenharia (TDD/BDD, trunk-based, feature flags)
+- Componentes e bibliotecas padrões já usados no projeto
+- Diagrama de alto nível da solução
+
+## 3. Implementação Isolada
+- Implementar apenas **uma funcionalidade por prompt/PR**
+- Seguir arquitetura e padrões validados
+- Incluir testes unitários e de integração
+- Garantir SRP (Single Responsibility Principle)
+- Incluir feature flag quando aplicável
+
+## 4. Checklist de Validação
+Após cada entrega, revisar:
+- [ ] PRD confirmado e versionado
+- [ ] Critérios de aceite atendidos
+- [ ] Arquitetura validada com trade-offs claros
+- [ ] Padrões/metodologias seguidos
+- [ ] Implementação isolada e idempotente
+- [ ] Testes cobrindo caminhos críticos e de erro
+- [ ] Observabilidade instrumentada (logs, métricas, tracing)
+- [ ] Segurança auditada (authN/Z, validações, secrets)
+- [ ] Documentação atualizada (README, ADR, changelog)
+- [ ] Plano de rollout/rollback definido
+
+## Integração com CI/CD
+
+### Pipeline de Integração Contínua
+- **Build automático** em cada push
+- **Testes unitários** executados automaticamente
+- **Linting e formatação** validados
+- **Type checking** obrigatório
+- **Security scanning** de dependências
+
+```yaml
+# .github/workflows/ci.yml - Exemplo de pipeline
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Format check
+        run: npm run format:check
+      
+      - name: Security audit
+        run: npm audit --audit-level moderate
+      
+      - name: Run tests
+        run: npm run test:ci
+      
+      - name: Coverage report
+        run: npm run test:coverage
+```
+
+### Branch Protection Rules
+- **Revisão obrigatória** antes do merge
+- **Status checks** devem passar
+- **Atualização obrigatória** da branch base
+- **Histórico linear** mantido
+
+```yaml
+# Configuração de Branch Protection (GitHub)
+branch_protection:
+  main:
+    required_status_checks:
+      strict: true
+      contexts:
+        - "Type Check"
+        - "Lint"
+        - "Tests"
+        - "Security Audit"
+    enforce_admins: true
+    required_pull_request_reviews:
+      required_approving_review_count: 2
+      dismiss_stale_reviews: true
+      require_code_owner_reviews: true
+    restrictions: null
+```
+
+### Deploy Automático
+- **Deploy automático** para staging em develop
+- **Deploy manual** para produção em main
+- **Rollback automático** em caso de falha
+- **Health checks** pós-deploy
+
+```yaml
+# Deploy para staging
+deploy_staging:
+  needs: quality
+  runs-on: ubuntu-latest
+  if: github.ref == 'refs/heads/develop'
+  steps:
+    - name: Deploy to staging
+      run: |
+        npm run build
+        npm run deploy:staging
+    
+    - name: Health check
+      run: |
+        curl -f $STAGING_URL/health || exit 1
+
+# Deploy para produção
+deploy_production:
+  needs: quality
+  runs-on: ubuntu-latest
+  if: github.ref == 'refs/heads/main'
+  environment: production
+  steps:
+    - name: Deploy to production
+      run: |
+        npm run build
+        npm run deploy:production
+    
+    - name: Health check
+      run: |
+        curl -f $PRODUCTION_URL/health || exit 1
+```
+
+## Checklist de CI/CD
+
+### Configuração Inicial
+- [ ] **Pipeline configurado** com todos os steps necessários
+- [ ] **Branch protection** ativado para main/develop
+- [ ] **Secrets configurados** para deploy
+- [ ] **Ambientes** (staging/prod) configurados
+
+### Validações Automáticas
+- [ ] **Build** executa sem erros
+- [ ] **Testes** passam com cobertura mínima
+- [ ] **Linting** sem warnings
+- [ ] **Type checking** sem erros
+- [ ] **Security audit** sem vulnerabilidades críticas
+
+### Deploy e Monitoramento
+- [ ] **Deploy automático** para staging
+- [ ] **Deploy manual** para produção
+- [ ] **Health checks** funcionando
+- [ ] **Rollback** testado e funcional
+- [ ] **Monitoramento** ativo pós-deploy

@@ -1,0 +1,577 @@
+---
+globs: "*.ts,*.tsx,*.js,*.jsx"
+description: "Padrões arquiteturais e de design para TypeScript/JavaScript"
+---
+
+# 🏗️ Padrões Arquiteturais
+
+## Princípios de Design
+- **Single Responsibility Principle (SRP)** - cada classe/função deve ter uma única responsabilidade
+- **Open/Closed Principle** - aberto para extensão, fechado para modificação
+- **Dependency Inversion** - dependa de abstrações, não de implementações concretas
+- **Interface Segregation** - interfaces específicas são melhores que interfaces genéricas
+
+## Estrutura de Arquivos
+- **Separe por domínio/funcionalidade**, não por tipo de arquivo
+- **Use barris (index.ts)** para exportações limpas
+- **Mantenha imports relativos organizados**
+- **Evite imports circulares**
+
+## Padrões de Código
+- **Use TypeScript strict mode** sempre
+- **Prefira interfaces sobre types** para objetos
+- **Use enums para valores constantes**
+- **Implemente validação de entrada** com bibliotecas como Zod ou Joi
+- **Use async/await** em vez de Promises.then()
+
+## Tratamento de Erros
+- **Use Error classes customizadas** para diferentes tipos de erro
+- **Implemente logging estruturado** (winston, pino)
+- **Sempre trate erros de forma explícita**
+- **Use try/catch apropriadamente**
+
+## Testes
+- **Teste comportamento, não implementação**
+- **Use AAA pattern**: Arrange, Act, Assert
+- **Mock apenas o necessário**
+- **Teste casos de sucesso e falha**
+- **Mantenha cobertura de testes alta (>80%)**
+
+## Performance
+- **Use lazy loading** quando apropriado
+- **Implemente memoização** para cálculos custosos
+- **Evite re-renders desnecessários** em React
+- **Use debounce/throttle** para eventos frequentes
+
+## Padrões Arquiteturais Avançados
+
+### SaaS Multi-Tenant Architecture
+```typescript
+// tenant-context.service.ts
+export class TenantContextService {
+  private static readonly TENANT_HEADER = 'x-tenant-id';
+  
+  static getTenantId(req: Request): string {
+    return req.headers[this.TENANT_HEADER] as string || 
+           req.user?.tenantId || 
+           'default';
+  }
+  
+  static setTenantContext(tenantId: string): void {
+    // Contexto global para operações
+    AsyncLocalStorage.set('tenantId', tenantId);
+  }
+  
+  static getCurrentTenant(): string {
+    return AsyncLocalStorage.get('tenantId') || 'default';
+  }
+}
+
+// tenant-aware.repository.ts
+export abstract class TenantAwareRepository<T> {
+  protected abstract tableName: string;
+  
+  constructor(private supabase: SupabaseClient) {}
+  
+  async findByTenant(tenantId: string, filters: Partial<T> = {}): Promise<T[]> {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .match(filters);
+    
+    if (error) throw error;
+    return data || [];
+  }
+  
+  async createForTenant(tenantId: string, data: Omit<T, 'tenant_id'>): Promise<T> {
+    const { data: result, error } = await this.supabase
+      .from(this.tableName)
+      .insert({ ...data, tenant_id: tenantId })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return result;
+  }
+}
+```
+
+### CQRS (Command Query Responsibility Segregation)
+```typescript
+// command.interface.ts
+export interface Command {
+  readonly type: string;
+  readonly tenantId: string;
+  readonly userId: string;
+  readonly timestamp: Date;
+}
+
+// query.interface.ts
+export interface Query {
+  readonly type: string;
+  readonly tenantId: string;
+  readonly userId: string;
+  readonly timestamp: Date;
+}
+
+// command-handler.interface.ts
+export interface CommandHandler<T extends Command> {
+  handle(command: T): Promise<void>;
+}
+
+// query-handler.interface.ts
+export interface QueryHandler<T extends Query, R> {
+  handle(query: T): Promise<R>;
+}
+
+// create-user.command.ts
+export class CreateUserCommand implements Command {
+  readonly type = 'CREATE_USER';
+  
+  constructor(
+    public readonly tenantId: string,
+    public readonly userId: string,
+    public readonly userData: CreateUserData,
+    public readonly timestamp: Date = new Date()
+  ) {}
+}
+
+// create-user.handler.ts
+export class CreateUserHandler implements CommandHandler<CreateUserCommand> {
+  constructor(
+    private userRepository: UserRepository,
+    private eventBus: EventBus
+  ) {}
+  
+  async handle(command: CreateUserCommand): Promise<void> {
+    const user = await this.userRepository.create({
+      ...command.userData,
+      tenant_id: command.tenantId,
+      created_by: command.userId
+    });
+    
+    await this.eventBus.publish(new UserCreatedEvent(
+      command.tenantId,
+      user.id,
+      user
+    ));
+  }
+}
+
+// get-user.query.ts
+export class GetUserQuery implements Query {
+  readonly type = 'GET_USER';
+  
+  constructor(
+    public readonly tenantId: string,
+    public readonly userId: string,
+    public readonly targetUserId: string,
+    public readonly timestamp: Date = new Date()
+  ) {}
+}
+
+// get-user.handler.ts
+export class GetUserHandler implements QueryHandler<GetUserQuery, User> {
+  constructor(private userRepository: UserRepository) {}
+  
+  async handle(query: GetUserQuery): Promise<User> {
+    return this.userRepository.findByTenantAndId(
+      query.tenantId, 
+      query.targetUserId
+    );
+  }
+}
+```
+
+### Event-Driven Architecture
+```typescript
+// event.interface.ts
+export interface DomainEvent {
+  readonly type: string;
+  readonly tenantId: string;
+  readonly aggregateId: string;
+  readonly version: number;
+  readonly timestamp: Date;
+  readonly payload: Record<string, any>;
+}
+
+// event-bus.interface.ts
+export interface EventBus {
+  publish(event: DomainEvent): Promise<void>;
+  subscribe(eventType: string, handler: EventHandler): void;
+}
+
+// user-created.event.ts
+export class UserCreatedEvent implements DomainEvent {
+  readonly type = 'USER_CREATED';
+  readonly version = 1;
+  readonly timestamp = new Date();
+  
+  constructor(
+    public readonly tenantId: string,
+    public readonly aggregateId: string,
+    public readonly payload: { user: User }
+  ) {}
+}
+
+// event-handler.interface.ts
+export interface EventHandler {
+  handle(event: DomainEvent): Promise<void>;
+}
+
+// send-welcome-email.handler.ts
+export class SendWelcomeEmailHandler implements EventHandler {
+  constructor(private emailService: EmailService) {}
+  
+  async handle(event: DomainEvent): Promise<void> {
+    if (event.type === 'USER_CREATED') {
+      const user = event.payload.user;
+      await this.emailService.sendWelcomeEmail(
+        user.email,
+        user.name,
+        event.tenantId
+      );
+    }
+  }
+}
+
+// event-store.interface.ts
+export interface EventStore {
+  append(streamId: string, events: DomainEvent[]): Promise<void>;
+  getEvents(streamId: string, fromVersion?: number): Promise<DomainEvent[]>;
+}
+
+// supabase-event-store.ts
+export class SupabaseEventStore implements EventStore {
+  constructor(private supabase: SupabaseClient) {}
+  
+  async append(streamId: string, events: DomainEvent[]): Promise<void> {
+    const eventRecords = events.map(event => ({
+      stream_id: streamId,
+      event_type: event.type,
+      event_data: event.payload,
+      tenant_id: event.tenantId,
+      aggregate_id: event.aggregateId,
+      version: event.version,
+      timestamp: event.timestamp
+    }));
+    
+    const { error } = await this.supabase
+      .from('event_store')
+      .insert(eventRecords);
+    
+    if (error) throw error;
+  }
+  
+  async getEvents(streamId: string, fromVersion: number = 0): Promise<DomainEvent[]> {
+    const { data, error } = await this.supabase
+      .from('event_store')
+      .select('*')
+      .eq('stream_id', streamId)
+      .gte('version', fromVersion)
+      .order('version');
+    
+    if (error) throw error;
+    
+    return data?.map(record => ({
+      type: record.event_type,
+      tenantId: record.tenant_id,
+      aggregateId: record.aggregate_id,
+      version: record.version,
+      timestamp: new Date(record.timestamp),
+      payload: record.event_data
+    })) || [];
+  }
+}
+```
+
+### Cache Distribuído Multi-Tenant
+```typescript
+// tenant-cache.service.ts
+export class TenantCacheService {
+  constructor(
+    private redis: Redis,
+    private tenantId: string
+  ) {}
+  
+  private getKey(domain: string, identifier: string): string {
+    return `${this.tenantId}:${domain}:${identifier}`;
+  }
+  
+  async get<T>(domain: string, identifier: string): Promise<T | null> {
+    const key = this.getKey(domain, identifier);
+    const value = await this.redis.get(key);
+    return value ? JSON.parse(value) : null;
+  }
+  
+  async set<T>(
+    domain: string, 
+    identifier: string, 
+    value: T, 
+    ttl: number = 3600
+  ): Promise<void> {
+    const key = this.getKey(domain, identifier);
+    await this.redis.setex(key, ttl, JSON.stringify(value));
+  }
+  
+  async invalidate(domain: string, pattern: string = '*'): Promise<void> {
+    const keyPattern = this.getKey(domain, pattern);
+    const keys = await this.redis.keys(keyPattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+  }
+  
+  async invalidateTenant(): Promise<void> {
+    const pattern = `${this.tenantId}:*`;
+    const keys = await this.redis.keys(pattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
+  }
+}
+
+// cache-aside.service.ts
+export class CacheAsideService<T> {
+  constructor(
+    private cache: TenantCacheService,
+    private repository: Repository<T>,
+    private domain: string
+  ) {}
+  
+  async get(id: string): Promise<T | null> {
+    // Tentar cache primeiro
+    let entity = await this.cache.get<T>(this.domain, id);
+    
+    if (!entity) {
+      // Cache miss - buscar no banco
+      entity = await this.repository.findById(id);
+      
+      if (entity) {
+        // Armazenar no cache
+        await this.cache.set(this.domain, id, entity);
+      }
+    }
+    
+    return entity;
+  }
+  
+  async update(id: string, data: Partial<T>): Promise<T> {
+    // Atualizar no banco
+    const entity = await this.repository.update(id, data);
+    
+    // Invalidar cache
+    await this.cache.invalidate(this.domain, id);
+    
+    return entity;
+  }
+  
+  async delete(id: string): Promise<void> {
+    // Deletar do banco
+    await this.repository.delete(id);
+    
+    // Invalidar cache
+    await this.cache.invalidate(this.domain, id);
+  }
+}
+```
+
+### Domain-Driven Design (DDD)
+- **Separe por domínios** de negócio, não por camadas técnicas
+- **Use Value Objects** para conceitos de negócio (Email, Money, etc.)
+- **Implemente Aggregates** para consistência transacional
+- **Defina Bounded Contexts** claros entre domínios
+
+```typescript
+// ✅ Exemplo de Value Object
+class Email {
+  private constructor(private readonly value: string) {
+    if (!this.isValid(value)) {
+      throw new InvalidEmailError('Invalid email format');
+    }
+  }
+  
+  static create(value: string): Email {
+    return new Email(value);
+  }
+  
+  getValue(): string {
+    return this.value;
+  }
+  
+  private isValid(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+}
+
+// ✅ Exemplo de Aggregate
+class User {
+  private constructor(
+    private readonly id: UserId,
+    private email: Email,
+    private profile: UserProfile
+  ) {}
+  
+  static create(id: UserId, email: Email, profile: UserProfile): User {
+    return new User(id, email, profile);
+  }
+  
+  updateEmail(newEmail: Email): void {
+    this.email = newEmail;
+    // Lógica de negócio para atualização de email
+  }
+}
+```
+
+### Event-Driven Architecture
+- **Use eventos** para comunicação entre contextos
+- **Implemente Event Sourcing** para auditoria e replay
+- **Separe Command e Query** (CQRS) quando apropriado
+- **Use Message Queues** para desacoplamento
+
+```typescript
+// ✅ Exemplo de Event
+interface UserCreatedEvent {
+  type: 'USER_CREATED';
+  userId: string;
+  email: string;
+  timestamp: Date;
+  version: number;
+}
+
+// ✅ Exemplo de Event Handler
+class UserCreatedEventHandler {
+  constructor(
+    private emailService: EmailService,
+    private auditService: AuditService
+  ) {}
+  
+  async handle(event: UserCreatedEvent): Promise<void> {
+    await this.emailService.sendWelcomeEmail(event.email);
+    await this.auditService.logUserCreation(event);
+  }
+}
+
+// ✅ Exemplo de Command/Query Separation
+class CreateUserCommand {
+  constructor(
+    public readonly email: string,
+    public readonly profile: UserProfile
+  ) {}
+}
+
+class GetUserQuery {
+  constructor(public readonly userId: string) {}
+}
+
+class UserCommandHandler {
+  async handle(command: CreateUserCommand): Promise<UserId> {
+    // Lógica de criação
+  }
+}
+
+class UserQueryHandler {
+  async handle(query: GetUserQuery): Promise<User> {
+    // Lógica de consulta
+  }
+}
+```
+
+### Clean Architecture
+- **Separe em camadas**: Domain, Application, Infrastructure, Presentation
+- **Dependências apontam para dentro** (Dependency Inversion)
+- **Use Ports and Adapters** para desacoplar infraestrutura
+- **Mantenha regras de negócio** na camada de domínio
+
+```typescript
+// ✅ Estrutura de Clean Architecture
+// domain/
+//   entities/
+//     user.entity.ts
+//   repositories/
+//     user.repository.interface.ts
+//   services/
+//     user.domain.service.ts
+
+// application/
+//   use-cases/
+//     create-user.use-case.ts
+//   interfaces/
+//     user.repository.interface.ts
+
+// infrastructure/
+//   repositories/
+//     user.repository.impl.ts
+//   database/
+//     user.schema.ts
+
+// presentation/
+//   controllers/
+//     user.controller.ts
+//   dto/
+//     create-user.dto.ts
+
+// ✅ Exemplo de Use Case
+class CreateUserUseCase {
+  constructor(
+    private userRepository: UserRepository,
+    private emailService: EmailService,
+    private eventBus: EventBus
+  ) {}
+  
+  async execute(command: CreateUserCommand): Promise<User> {
+    const user = User.create(
+      UserId.generate(),
+      Email.create(command.email),
+      command.profile
+    );
+    
+    await this.userRepository.save(user);
+    await this.emailService.sendWelcomeEmail(user.getEmail());
+    
+    await this.eventBus.publish(new UserCreatedEvent(user));
+    
+    return user;
+  }
+}
+```
+
+### Modularização em Monorepo
+- **Separe por domínio** ou funcionalidade
+- **Use workspaces** para compartilhamento de código
+- **Mantenha dependências** bem definidas entre módulos
+- **Implemente APIs internas** para comunicação
+
+```typescript
+// ✅ Estrutura de Monorepo
+// packages/
+//   shared/
+//     types/
+//     utils/
+//     constants/
+//   user-service/
+//     src/
+//       domain/
+//       application/
+//       infrastructure/
+//   notification-service/
+//     src/
+//       handlers/
+//       services/
+
+// ✅ Exemplo de API Interna
+interface UserServiceAPI {
+  getUserById(id: string): Promise<User>;
+  createUser(userData: CreateUserData): Promise<User>;
+}
+
+class NotificationService {
+  constructor(private userService: UserServiceAPI) {}
+  
+  async sendNotification(userId: string, message: string): Promise<void> {
+    const user = await this.userService.getUserById(userId);
+    // Lógica de notificação
+  }
+}
+```

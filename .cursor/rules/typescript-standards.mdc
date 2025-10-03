@@ -1,0 +1,336 @@
+---
+globs: "*.ts,*.tsx"
+description: "Padrões de qualidade e uso correto do TypeScript"
+---
+
+# 📄 Padrões de TypeScript
+
+## Objetivo
+Garantir que o código em **TypeScript** mantenha alta qualidade, segurança e legibilidade.
+Para isso, erros e warnings não devem ser ignorados sem justificativa clara.
+
+## Regras sobre `@ts-ignore`
+
+### 1. Proibido usar `@ts-ignore` sem explicação
+- **Nunca adicionar `@ts-ignore` sozinho** em uma linha
+- **Sempre documentar o motivo** com um comentário claro e objetivo acima da diretiva
+- O comentário deve explicar **por que o erro é ignorado** e, se possível, **qual será a solução futura**
+
+#### ✅ Exemplo correto:
+```typescript
+// @ts-ignore: biblioteca externa não possui tipos oficiais
+import libX from "lib-x";
+```
+
+#### ❌ Exemplo incorreto:
+```typescript
+// @ts-ignore
+import libX from "lib-x";
+```
+
+### 2. Prefira soluções adequadas a ignorar tipos
+- **Instalar pacotes de tipagem** (`@types/...`) quando disponíveis
+- **Criar declarações de tipos manuais** quando necessário (`*.d.ts`)
+- **Usar `unknown` ou `any` apenas como último recurso**, e sempre com justificativa
+
+## Warnings = Erros
+
+- **Nenhum warning deve ser deixado no código**
+- **Todos os warnings devem ser tratados como erros** e corrigidos antes de merge
+- **Justificativas devem ser adicionadas em comentários** somente se **não houver alternativa viável**
+
+## Alternativas ao `@ts-ignore`
+
+### 1. Instalar tipos oficiais
+```bash
+npm install @types/nome-da-biblioteca
+```
+
+### 2. Criar declarações de tipos customizadas
+```typescript
+// types/custom.d.ts
+declare module 'biblioteca-sem-tipos' {
+  export function minhaFuncao(param: string): number;
+}
+```
+
+### 3. Usar `unknown` com type guards
+```typescript
+// Em vez de @ts-ignore
+const data: unknown = response.data;
+if (typeof data === 'string') {
+  // Agora TypeScript sabe que data é string
+  console.log(data.toUpperCase());
+}
+```
+
+### 4. Usar type assertions com cuidado
+```typescript
+// Apenas quando você tem certeza do tipo
+const element = document.getElementById('myId') as HTMLInputElement;
+```
+
+## Checklist antes de commitar código TypeScript
+
+- [ ] **Não há `@ts-ignore` sem comentário explicativo**
+- [ ] **Qualquer `@ts-ignore` usado tem justificativa clara e técnica**
+- [ ] **Não existem warnings pendentes no projeto**
+- [ ] **Foram buscadas alternativas melhores** antes de usar `@ts-ignore` ou `any`
+- [ ] **O código está tipado corretamente** e passa em todos os checks de TypeScript
+- [ ] **Todas as funções têm tipos de retorno explícitos**
+- [ ] **Interfaces e tipos estão bem definidos**
+- [ ] **Não há uso desnecessário de `any`**
+
+## Exemplos de Boas Práticas
+
+### ✅ Tipagem explícita
+```typescript
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+function createUser(userData: Omit<User, 'id'>): User {
+  return {
+    id: Date.now(),
+    ...userData
+  };
+}
+```
+
+### ✅ Type guards
+```typescript
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function processData(data: unknown): string {
+  if (isString(data)) {
+    return data.toUpperCase(); // TypeScript sabe que é string
+  }
+  throw new Error('Expected string');
+}
+```
+
+### ✅ Generics apropriados
+```typescript
+function createArray<T>(length: number, value: T): T[] {
+  return Array(length).fill(value);
+}
+```
+
+## Exemplos de Uso Incorreto ❌
+
+```typescript
+// @ts-ignore sem explicação
+const data = someFunction();
+
+// any desnecessário
+function processData(data: any): any {
+  return data.something;
+}
+
+// Warning ignorado
+const unused = 'this will cause a warning';
+```
+
+## TypeScript Strict Mode Obrigatório
+
+### Configuração Strict Obrigatória
+- **strict: true** deve estar sempre ativado
+- **noImplicitAny: true** - proíbe any implícito
+- **strictNullChecks: true** - verificação rigorosa de null/undefined
+- **strictFunctionTypes: true** - verificação rigorosa de tipos de função
+- **noImplicitReturns: true** - todas as funções devem ter return explícito
+- **noFallthroughCasesInSwitch: true** - proíbe fallthrough em switch
+- **noUncheckedIndexedAccess: true** - verifica acesso a índices
+
+```json
+// tsconfig.json - Configuração strict obrigatória
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true
+  }
+}
+```
+
+### Validação de Configuração
+```bash
+# Script para validar configuração strict
+npm run type-check:strict
+
+# package.json
+{
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "type-check:strict": "tsc --noEmit --strict",
+    "type-check:ci": "tsc --noEmit --strict --noErrorTruncation"
+  }
+}
+```
+
+### Exemplos de Código Strict-Compliant
+
+#### ✅ Tipagem Explícita Obrigatória
+```typescript
+// ✅ Função com tipos explícitos
+function calculateTotal(items: Item[]): number {
+  return items.reduce((total: number, item: Item): number => {
+    return total + item.price;
+  }, 0);
+}
+
+// ✅ Interface bem definida
+interface User {
+  readonly id: string;
+  name: string;
+  email: string;
+  age?: number; // Optional property
+  createdAt: Date;
+}
+
+// ✅ Generic com constraints
+function processItems<T extends { id: string }>(items: T[]): T[] {
+  return items.filter((item: T): boolean => item.id !== '');
+}
+```
+
+#### ✅ Null Safety Rigorosa
+```typescript
+// ✅ Verificação explícita de null/undefined
+function getUserName(user: User | null): string {
+  if (user === null || user === undefined) {
+    return 'Unknown User';
+  }
+  return user.name;
+}
+
+// ✅ Optional chaining e nullish coalescing
+function getAddress(user: User): string {
+  return user.address?.street ?? 'No address provided';
+}
+
+// ✅ Type guards
+function isUser(obj: unknown): obj is User {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'id' in obj &&
+    'name' in obj &&
+    'email' in obj
+  );
+}
+```
+
+#### ✅ Strict Function Types
+```typescript
+// ✅ Funções com tipos rigorosos
+type EventHandler = (event: Event) => void;
+type MouseEventHandler = (event: MouseEvent) => void;
+
+// ❌ Isso não compila com strictFunctionTypes
+// const handler: EventHandler = (event: MouseEvent) => { ... };
+
+// ✅ Tipos compatíveis
+const mouseHandler: MouseEventHandler = (event: MouseEvent) => {
+  console.log(event.clientX);
+};
+
+const eventHandler: EventHandler = mouseHandler; // ✅ Compatível
+```
+
+#### ✅ No Implicit Returns
+```typescript
+// ✅ Return explícito em todas as funções
+function processData(data: string[]): string[] {
+  if (data.length === 0) {
+    return []; // Return explícito
+  }
+  
+  return data.map((item: string): string => {
+    return item.toUpperCase(); // Return explícito
+  });
+}
+
+// ✅ Funções void explícitas
+function logMessage(message: string): void {
+  console.log(message);
+  // Não precisa de return, mas void é explícito
+}
+```
+
+### Verificação de Qualidade TypeScript
+
+#### ESLint Rules para TypeScript
+```json
+// .eslintrc.js - Regras TypeScript rigorosas
+{
+  "extends": [
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking"
+  ],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-implicit-any": "error",
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "@typescript-eslint/explicit-module-boundary-types": "error",
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "@typescript-eslint/prefer-nullish-coalescing": "error",
+    "@typescript-eslint/prefer-optional-chain": "error",
+    "@typescript-eslint/strict-boolean-expressions": "error"
+  }
+}
+```
+
+#### Pre-commit Hooks
+```json
+// package.json - Hooks para validação
+{
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "tsc --noEmit --strict",
+      "prettier --write"
+    ]
+  }
+}
+```
+
+## Checklist de TypeScript Strict
+
+### Configuração
+- [ ] **tsconfig.json** com strict: true
+- [ ] **Todas as opções strict** ativadas
+- [ ] **ESLint** configurado com regras TypeScript
+- [ ] **Pre-commit hooks** validando tipos
+
+### Desenvolvimento
+- [ ] **Zero any** sem justificativa
+- [ ] **Tipos explícitos** em todas as funções
+- [ ] **Null safety** implementada
+- [ ] **Interfaces bem definidas**
+
+### Validação
+- [ ] **Compilação** sem erros
+- [ ] **ESLint** sem warnings
+- [ ] **Type checking** no CI/CD
+- [ ] **Cobertura de tipos** adequada

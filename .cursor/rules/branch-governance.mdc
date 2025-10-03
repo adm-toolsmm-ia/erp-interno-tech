@@ -1,0 +1,412 @@
+---
+alwaysApply: true
+description: "Governança de branches, PRs e workflow de desenvolvimento com naming conventions e proteções"
+---
+
+# 🌿 Governança de Branches e PRs
+
+## Branch Naming Convention Obrigatória
+
+### Padrão de Nomenclatura
+```bash
+# Formato: {tipo}/{descrição-curta}
+feature/user-authentication
+fix/login-validation-error
+hotfix/security-vulnerability
+refactor/extract-validation-service
+docs/api-documentation
+test/add-user-service-tests
+chore/update-dependencies
+```
+
+### Tipos de Branch Permitidos
+- **`feature/`** - Novas funcionalidades
+- **`fix/`** - Correções de bugs
+- **`hotfix/`** - Correções urgentes em produção
+- **`refactor/`** - Refatorações de código
+- **`docs/`** - Mudanças na documentação
+- **`test/`** - Adição ou correção de testes
+- **`chore/`** - Tarefas de manutenção
+
+### Validação Automática de Naming
+```yaml
+# .github/workflows/branch-naming.yml
+name: Branch Naming Check
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  check-branch-naming:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming
+        run: |
+          BRANCH_NAME=${GITHUB_HEAD_REF}
+          if ! echo "$BRANCH_NAME" | grep -E "^(feature|fix|hotfix|refactor|docs|test|chore)/[a-z0-9-]+$"; then
+            echo "❌ Branch name '$BRANCH_NAME' does not follow convention"
+            echo "Expected format: {type}/{description}"
+            echo "Valid types: feature, fix, hotfix, refactor, docs, test, chore"
+            exit 1
+          fi
+          echo "✅ Branch naming convention followed"
+```
+
+## Branch Protection Rules
+
+### Configuração Obrigatória
+```yaml
+# .github/branch-protection.yml
+name: Configure Branch Protection
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  protect-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Protect main branch
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.updateBranchProtection({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main',
+              required_status_checks: {
+                strict: true,
+                contexts: [
+                  'Type Check',
+                  'Lint',
+                  'Tests',
+                  'Security Audit',
+                  'Coverage',
+                  'Documentation Check'
+                ]
+              },
+              enforce_admins: true,
+              required_pull_request_reviews: {
+                required_approving_review_count: 2,
+                dismiss_stale_reviews: true,
+                require_code_owner_reviews: true,
+                required_reviewers: ['senior-dev', 'tech-lead']
+              },
+              restrictions: null,
+              allow_force_pushes: false,
+              allow_deletions: false
+            });
+      
+      - name: Protect develop branch
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.updateBranchProtection({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'develop',
+              required_status_checks: {
+                strict: true,
+                contexts: [
+                  'Type Check',
+                  'Lint',
+                  'Tests',
+                  'Security Audit'
+                ]
+              },
+              enforce_admins: true,
+              required_pull_request_reviews: {
+                required_approving_review_count: 1,
+                dismiss_stale_reviews: true,
+                require_code_owner_reviews: false
+              },
+              restrictions: null
+            });
+```
+
+## Pull Request Template
+
+### Template Obrigatório
+```markdown
+<!-- .github/pull_request_template.md -->
+## 📋 Descrição
+<!-- Descreva brevemente as mudanças realizadas -->
+
+## 🎯 Tipo de Mudança
+- [ ] 🐛 Bug fix (mudança que corrige um problema)
+- [ ] ✨ Nova funcionalidade (mudança que adiciona funcionalidade)
+- [ ] 💥 Breaking change (correção ou funcionalidade que causaria mudança em funcionalidade existente)
+- [ ] 📚 Documentação (mudança apenas na documentação)
+- [ ] 🔧 Refatoração (mudança de código que não corrige bug nem adiciona funcionalidade)
+- [ ] ⚡ Performance (mudança que melhora performance)
+- [ ] 🧪 Testes (adição ou correção de testes)
+
+## 🔗 Issues Relacionadas
+<!-- Link para issues relacionadas -->
+Fixes #(issue)
+
+## 🧪 Como Testar
+<!-- Descreva os passos para testar as mudanças -->
+1. 
+2. 
+3. 
+
+## 📸 Screenshots (se aplicável)
+<!-- Adicione screenshots para ajudar a explicar as mudanças -->
+
+## ✅ Checklist
+- [ ] Meu código segue as diretrizes de estilo do projeto
+- [ ] Realizei uma auto-revisão do meu código
+- [ ] Comentei código complexo ou difícil de entender
+- [ ] Fiz as mudanças correspondentes na documentação
+- [ ] Minhas mudanças não geram novos warnings
+- [ ] Adicionei testes que provam que minha correção é eficaz ou que minha funcionalidade funciona
+- [ ] Testes novos e existentes passam localmente com minhas mudanças
+- [ ] Qualquer mudança dependente foi mergeada e publicada
+
+## 🔒 Segurança
+- [ ] Não expus informações sensíveis
+- [ ] Validei todas as entradas do usuário
+- [ ] Implementei autenticação/autorização adequada
+- [ ] Testei cenários de segurança
+
+## 📊 Performance
+- [ ] Minhas mudanças não degradam a performance
+- [ ] Implementei cache quando apropriado
+- [ ] Otimizei queries de banco de dados
+- [ ] Testei com dados de volume real
+
+## 🌐 Multi-Tenancy
+- [ ] Todas as operações incluem `tenantId`
+- [ ] RLS está configurado corretamente
+- [ ] Cache é invalidado por tenant
+- [ ] Logs incluem contexto de tenant
+```
+
+## Code Review Guidelines
+
+### Checklist para Revisores
+```markdown
+## 🔍 Checklist de Code Review
+
+### Funcionalidade
+- [ ] O código faz o que deveria fazer?
+- [ ] A lógica está correta?
+- [ ] Há casos edge não cobertos?
+- [ ] A performance está adequada?
+
+### Código
+- [ ] O código é legível e bem estruturado?
+- [ ] Segue os padrões do projeto?
+- [ ] Não há duplicação desnecessária?
+- [ ] Nomes de variáveis/funções são descritivos?
+
+### Testes
+- [ ] Testes cobrem a funcionalidade?
+- [ ] Testes são significativos e não frágeis?
+- [ ] Cobertura de código é adequada?
+
+### Segurança
+- [ ] Não há vulnerabilidades de segurança?
+- [ ] Validação de entrada está adequada?
+- [ ] Dados sensíveis não são expostos?
+
+### Documentação
+- [ ] README.md foi atualizado?
+- [ ] CHANGELOG.md foi atualizado?
+- [ ] Comentários explicam código complexo?
+
+### Multi-Tenancy
+- [ ] `tenantId` está presente em todas as operações?
+- [ ] RLS está configurado corretamente?
+- [ ] Cache é invalidado por tenant?
+```
+
+## Workflow de Desenvolvimento
+
+### 1. Criação de Branch
+```bash
+# Sempre partir da main/develop
+git checkout main
+git pull origin main
+git checkout -b feature/user-authentication
+
+# Ou para hotfix
+git checkout -b hotfix/security-vulnerability
+```
+
+### 2. Desenvolvimento
+```bash
+# Commits frequentes e bem descritos
+git add .
+git commit -m "feat: adicionar validação de email no registro"
+
+# Push regular para backup
+git push origin feature/user-authentication
+```
+
+### 3. Pull Request
+```bash
+# Criar PR via GitHub CLI
+gh pr create --title "feat: implementar autenticação de usuário" \
+  --body "Implementa sistema completo de autenticação com JWT e MFA" \
+  --assignee @me \
+  --reviewer senior-dev,tech-lead
+```
+
+### 4. Merge Strategy
+```bash
+# Squash and merge para features
+# Merge commit para hotfixes críticos
+# Rebase antes do merge para histórico limpo
+```
+
+## Validações Automáticas de PR
+
+### Pre-merge Checks
+```yaml
+# .github/workflows/pr-validation.yml
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Check PR title
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          if ! echo "$TITLE" | grep -E "^(feat|fix|hotfix|refactor|docs|test|chore):"; then
+            echo "❌ PR title must start with type (feat, fix, hotfix, refactor, docs, test, chore)"
+            exit 1
+          fi
+      
+      - name: Check file changes
+        run: |
+          # Verificar se arquivos críticos foram alterados
+          if git diff --name-only origin/main...HEAD | grep -E "package\.json|yarn\.lock|package-lock\.json"; then
+            echo "⚠️ Dependencies changed - ensure security audit passes"
+          fi
+      
+      - name: Check documentation
+        run: |
+          # Verificar se docs foram atualizados para mudanças significativas
+          if git log --oneline origin/main...HEAD | grep -E "^(feat|fix):" && ! git diff --name-only origin/main...HEAD | grep -E "README\.md|CHANGELOG\.md"; then
+            echo "❌ Feat/Fix commits must update documentation"
+            exit 1
+          fi
+      
+      - name: Check commit messages
+        run: |
+          # Verificar se commits seguem convenção
+          git log --oneline origin/main...HEAD | while read commit; do
+            if ! echo "$commit" | grep -E "^(feat|fix|hotfix|refactor|docs|test|chore):"; then
+              echo "❌ Commit message '$commit' does not follow convention"
+              exit 1
+            fi
+          done
+```
+
+## Merge Policies
+
+### Estratégias por Tipo de Branch
+```yaml
+# Configuração de merge policies
+merge_policies:
+  feature/*:
+    strategy: "squash_and_merge"
+    delete_branch: true
+    require_approval: 2
+  
+  fix/*:
+    strategy: "squash_and_merge"
+    delete_branch: true
+    require_approval: 1
+  
+  hotfix/*:
+    strategy: "merge_commit"
+    delete_branch: false
+    require_approval: 2
+    auto_merge: false
+  
+  refactor/*:
+    strategy: "squash_and_merge"
+    delete_branch: true
+    require_approval: 2
+  
+  docs/*:
+    strategy: "squash_and_merge"
+    delete_branch: true
+    require_approval: 1
+  
+  test/*:
+    strategy: "squash_and_merge"
+    delete_branch: true
+    require_approval: 1
+  
+  chore/*:
+    strategy: "squash_and_merge"
+    delete_branch: true
+    require_approval: 1
+```
+
+## Auto-merge para Mudanças Menores
+
+### Configuração de Auto-merge
+```yaml
+# .github/workflows/auto-merge.yml
+name: Auto-merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: |
+      github.event.pull_request.draft == false &&
+      contains(github.event.pull_request.labels.*.name, 'auto-merge') &&
+      github.event.pull_request.user.type != 'Bot'
+    steps:
+      - name: Enable auto-merge
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --auto --squash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+## ✅ Checklist Score 10
+
+### Branch Naming
+- [ ] **Convenção** seguida rigorosamente
+- [ ] **Validação automática** configurada
+- [ ] **Tipos permitidos** bem definidos
+- [ ] **Exemplos claros** documentados
+
+### Branch Protection
+- [ ] **Main branch** protegida com 2 aprovações
+- [ ] **Develop branch** protegida com 1 aprovação
+- [ ] **Status checks** obrigatórios
+- [ ] **Force push** desabilitado
+
+### Pull Requests
+- [ ] **Template** obrigatório preenchido
+- [ ] **Validações automáticas** funcionando
+- [ ] **Code review** estruturado
+- [ ] **Merge policies** definidas
+
+### Workflow
+- [ ] **Processo claro** documentado
+- [ ] **Ferramentas** configuradas
+- [ ] **Automação** implementada
+- [ ] **Qualidade** garantida

@@ -1,0 +1,426 @@
+---
+alwaysApply: true
+description: "Regras de CI/CD e automação para validação automática de qualidade, segurança e testes"
+---
+
+# 🚀 CI/CD e Automação
+
+## Pipeline de Integração Contínua Obrigatório
+
+### Configuração Base
+```yaml
+# .github/workflows/ci.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Format check
+        run: npm run format:check
+      
+      - name: Security audit
+        run: npm audit --audit-level moderate
+      
+      - name: Run tests
+        run: npm run test:ci
+      
+      - name: Coverage report
+        run: npm run test:coverage
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+```
+
+### Validações de Qualidade
+```yaml
+# .github/workflows/quality.yml
+name: Quality Checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: ESLint
+        run: npm run lint
+      
+      - name: Prettier
+        run: npm run format:check
+      
+      - name: TypeScript strict check
+        run: npm run type-check
+      
+      - name: Test coverage
+        run: npm run test:coverage
+      
+      - name: Coverage threshold
+        run: |
+          if [ $(cat coverage/coverage-summary.txt | grep -o '[0-9]*\.[0-9]*%' | head -1 | sed 's/%//' | cut -d. -f1) -lt 80 ]; then
+            echo "❌ Coverage below 80%"
+            exit 1
+          fi
+```
+
+### Validações de Segurança
+```yaml
+# .github/workflows/security.yml
+name: Security Checks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * 1' # Weekly
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: NPM audit
+        run: npm audit --audit-level moderate
+      
+      - name: Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+      
+      - name: OWASP dependency check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'app-gestao-pessoal'
+          path: '.'
+          format: 'JSON'
+          failOnCVSS: 7
+```
+
+## Branch Protection Rules
+
+### Configuração Obrigatória
+```yaml
+# .github/branch-protection.yml
+name: Branch Protection
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure branch protection
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.updateBranchProtection({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main',
+              required_status_checks: {
+                strict: true,
+                contexts: [
+                  'Type Check',
+                  'Lint',
+                  'Tests',
+                  'Security Audit',
+                  'Coverage'
+                ]
+              },
+              enforce_admins: true,
+              required_pull_request_reviews: {
+                required_approving_review_count: 2,
+                dismiss_stale_reviews: true,
+                require_code_owner_reviews: true
+              },
+              restrictions: null
+            });
+```
+
+## Scripts de Package.json Obrigatórios
+
+```json
+{
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "jest",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:coverage": "jest --coverage --watchAll=false",
+    "test:watch": "jest --watch",
+    "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand",
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix",
+    "audit:ci": "npm audit --audit-level moderate",
+    "security:scan": "snyk test",
+    "security:monitor": "snyk monitor",
+    "quality": "npm run type-check && npm run lint && npm run format:check && npm run test:coverage",
+    "pre-commit": "lint-staged",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}
+```
+
+## Configuração de Ferramentas
+
+### ESLint Config
+```json
+// .eslintrc.js
+{
+  "extends": [
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking",
+    "prettier"
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "no-console": "warn",
+    "prefer-const": "error",
+    "no-var": "error",
+    "prefer-arrow-callback": "error"
+  }
+}
+```
+
+### Prettier Config
+```json
+// .prettierrc
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false
+}
+```
+
+### Jest Config
+```json
+// jest.config.js
+{
+  "collectCoverage": true,
+  "coverageDirectory": "coverage",
+  "coverageReporters": ["text", "lcov", "html"],
+  "coverageThreshold": {
+    "global": {
+      "branches": 80,
+      "functions": 90,
+      "lines": 85,
+      "statements": 85
+    }
+  },
+  "collectCoverageFrom": [
+    "src/**/*.{ts,tsx}",
+    "!src/**/*.d.ts",
+    "!src/**/*.stories.{ts,tsx}",
+    "!src/**/index.{ts,tsx}"
+  ]
+}
+```
+
+## Deploy Automático
+
+### Staging
+```yaml
+# .github/workflows/deploy-staging.yml
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.ORG_ID }}
+          vercel-project-id: ${{ secrets.PROJECT_ID }}
+          vercel-args: '--prod'
+      
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f $STAGING_URL/health || exit 1
+```
+
+### Production
+```yaml
+# .github/workflows/deploy-production.yml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.ORG_ID }}
+          vercel-project-id: ${{ secrets.PROJECT_ID }}
+          vercel-args: '--prod'
+      
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f $PRODUCTION_URL/health || exit 1
+      
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+## Monitoramento de Performance
+
+### Lighthouse CI
+```yaml
+# .github/workflows/lighthouse.yml
+name: Lighthouse CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v9
+        with:
+          configPath: './lighthouse.config.js'
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+```
+
+## ✅ Checklist Score 10
+
+### Configuração Inicial
+- [ ] **Pipeline configurado** com todos os steps necessários
+- [ ] **Branch protection** ativado para main/develop
+- [ ] **Secrets configurados** para deploy
+- [ ] **Ambientes** (staging/prod) configurados
+
+### Validações Automáticas
+- [ ] **Build** executa sem erros
+- [ ] **Testes** passam com cobertura mínima de 80%
+- [ ] **Linting** sem warnings
+- [ ] **Type checking** sem erros
+- [ ] **Security audit** sem vulnerabilidades críticas
+
+### Deploy e Monitoramento
+- [ ] **Deploy automático** para staging
+- [ ] **Deploy manual** para produção
+- [ ] **Health checks** funcionando
+- [ ] **Rollback** testado e funcional
+- [ ] **Monitoramento** ativo pós-deploy

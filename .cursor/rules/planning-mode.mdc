@@ -1,0 +1,135 @@
+---
+description: "Modo Planejador - Processo de planejamento detalhado"
+---
+
+# 🎯 Modo Planejador
+
+Quando solicitado a entrar no "Modo Planejador":
+
+## Processo Obrigatório
+1. **Reflita profundamente** sobre as mudanças solicitadas
+2. **Analise o código existente** para mapear todo o escopo das alterações necessárias
+3. **Faça de 4 a 6 perguntas esclarecedoras** com base nas descobertas
+4. **Aguarde as respostas** antes de prosseguir
+5. **Elabore um plano de ação abrangente** e peça aprovação
+6. **Implemente todas as etapas do plano** após aprovação
+
+## Após Conclusão de Cada Fase
+- **Mencione o que foi concluído**
+- **Indique quais são os próximos passos**
+- **Especifique quais fases ainda restam**
+
+## Exemplo de Perguntas Esclarecedoras
+- Qual é o objetivo principal desta funcionalidade?
+- Existem restrições de performance ou segurança específicas?
+- Há integrações com sistemas externos necessárias?
+- Qual é o prazo esperado para entrega?
+- Existem dependências com outras funcionalidades?
+- Há preferências específicas de arquitetura ou tecnologia?
+
+## Template de PRD Mínimo
+
+### 1. Visão Geral
+- **Título**: Nome claro e conciso da funcionalidade
+- **Objetivo**: Por que esta funcionalidade é necessária?
+- **Impacto**: Qual problema resolve ou valor agrega?
+- **Escopo**: O que está incluído e excluído?
+
+### 2. Usuários e Casos de Uso
+- **Personas**: Quem vai usar esta funcionalidade?
+- **Jornada do usuário**: Como será utilizada?
+- **Cenários de uso**: Quais são os principais fluxos?
+- **Casos de borda**: O que acontece em situações excepcionais?
+
+### 3. Requisitos Funcionais
+- **Entradas**: Quais dados são necessários?
+- **Processamento**: Como os dados são transformados?
+- **Saídas**: O que é retornado ou exibido?
+- **Validações**: Quais regras de negócio se aplicam?
+
+### 4. Requisitos Não-Funcionais
+- **Performance**: Tempo de resposta esperado
+- **Segurança**: Controles de acesso necessários
+- **Escalabilidade**: Volume de usuários/dados
+- **Compatibilidade**: Navegadores/plataformas suportadas
+
+### 5. Critérios de Aceite
+- **Given/When/Then** para cada cenário principal
+- **Métricas de sucesso** mensuráveis
+- **Testes de regressão** necessários
+- **Validação de UX** com usuários
+
+### 6. Riscos e Dependências
+- **Riscos técnicos**: Complexidade, integrações
+- **Riscos de negócio**: Impacto em outras funcionalidades
+- **Dependências**: Outras equipes, sistemas externos
+- **Mitigações**: Como reduzir ou eliminar riscos
+
+## Checklist de PRD Completo
+
+### Informações Básicas
+- [ ] **Título claro** e descritivo
+- [ ] **Objetivo** bem definido e justificado
+- [ ] **Escopo** delimitado (incluído/excluído)
+- [ ] **Prioridade** definida (alta/média/baixa)
+
+### Usuários e Experiência
+- [ ] **Personas** identificadas e descritas
+- [ ] **Jornada do usuário** mapeada
+- [ ] **Casos de uso** principais documentados
+- [ ] **Casos de borda** considerados
+
+### Requisitos Técnicos
+- [ ] **Entradas e saídas** especificadas
+- [ ] **Validações** de dados definidas
+- [ ] **Regras de negócio** documentadas
+- [ ] **Integrações** necessárias listadas
+
+### Qualidade e Performance
+- [ ] **Critérios de aceite** em formato Given/When/Then
+- [ ] **Métricas de sucesso** mensuráveis
+- [ ] **Requisitos de performance** especificados
+- [ ] **Requisitos de segurança** identificados
+
+### Planejamento e Riscos
+- [ ] **Estimativa de esforço** realizada
+- [ ] **Dependências** mapeadas
+- [ ] **Riscos** identificados e mitigados
+- [ ] **Plano de testes** definido
+
+## Exemplo de PRD Completo
+
+### Funcionalidade: Sistema de Notificações Push
+
+#### 1. Visão Geral
+- **Título**: Sistema de Notificações Push em Tempo Real
+- **Objetivo**: Permitir que usuários recebam notificações instantâneas sobre eventos importantes
+- **Impacto**: Aumentar engajamento em 25% e reduzir tempo de resposta a eventos críticos
+- **Escopo**: Inclui envio, recebimento e gerenciamento de notificações. Exclui notificações por email/SMS
+
+#### 2. Usuários e Casos de Uso
+- **Personas**: Usuários ativos da plataforma, administradores
+- **Jornada**: Usuário recebe notificação → Visualiza → Toma ação
+- **Cenários**: Nova mensagem, alerta de sistema, convite para reunião
+- **Casos de borda**: Usuário offline, notificação duplicada, limite de notificações
+
+#### 3. Requisitos Funcionais
+- **Entradas**: Tipo de notificação, destinatário, conteúdo, prioridade
+- **Processamento**: Validação, formatação, entrega via WebSocket
+- **Saídas**: Notificação exibida no frontend, confirmação de entrega
+- **Validações**: Usuário ativo, permissões, limite de taxa
+
+#### 4. Requisitos Não-Funcionais
+- **Performance**: < 500ms para entrega
+- **Segurança**: Autenticação JWT, autorização por perfil
+- **Escalabilidade**: 10.000 usuários simultâneos
+- **Compatibilidade**: Chrome 90+, Firefox 88+, Safari 14+
+
+#### 5. Critérios de Aceite
+- **Given** usuário logado e online
+- **When** recebe notificação de nova mensagem
+- **Then** deve exibir popup e som de alerta
+
+#### 6. Riscos e Dependências
+- **Risco**: WebSocket pode falhar → Mitigação: Fallback para polling
+- **Dependência**: Serviço de autenticação → Coordenação com equipe de auth

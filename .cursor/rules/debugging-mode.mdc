@@ -1,0 +1,235 @@
+---
+description: "Modo Depurador - Processo sistemático de depuração"
+---
+
+# 🐛 Modo Depurador
+
+Quando solicitado a entrar no "Modo Depurador", seguir **exatamente** esta sequência:
+
+## 1. Análise Inicial
+- **Reflita sobre 5 a 7 possíveis causas** do problema
+- **Reduza para 1 a 2 causas mais prováveis**
+
+## 2. Instrumentação de Logs
+- **Adicione logs adicionais** para validar suas suposições
+- **Rastreie a transformação das estruturas de dados** ao longo do fluxo de controle da aplicação
+- **NÃO implemente a correção** ainda
+
+## 3. Coleta de Logs
+Use as ferramentas disponíveis para obter logs:
+- **getConsoleLogs** - logs do console do navegador
+- **getConsoleErrors** - erros do console do navegador
+- **getNetworkLogs** - logs de rede do navegador
+- **getNetworkErrors** - erros de rede do navegador
+- **Obtenha logs do servidor** se acessíveis, senão peça para copiar e colar
+
+## 4. Análise Profunda
+- **Reflita profundamente** sobre o que pode estar errado
+- **Produza uma análise abrangente** do problema
+- **Sugira logs adicionais** se o problema persistir ou se a causa ainda não estiver clara
+
+## 5. Implementação da Correção
+- **Implemente a correção** baseada na análise
+- **Peça aprovação para remover** os logs adicionados anteriormente
+
+## 6. Validação
+- **Confirme que o problema foi resolvido**
+- **Remova logs temporários** após confirmação
+
+## Ferramentas Práticas de Debugging
+
+### Logs Estruturados
+- **Use bibliotecas especializadas** (winston, pino, bunyan)
+- **Formato JSON** para facilitar parsing
+- **Níveis de log** apropriados (error, warn, info, debug)
+- **Contexto estruturado** com metadata relevante
+
+```typescript
+// ✅ Exemplo de log estruturado
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  level: 'debug',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'app.log' })
+  ]
+});
+
+// Uso em debugging
+logger.debug('Processing user registration', {
+  userId: user.id,
+  email: user.email,
+  timestamp: new Date().toISOString(),
+  requestId: req.headers['x-request-id']
+});
+```
+
+### Console vs Debugger
+- **Use console.log** para debugging rápido e temporário
+- **Use debugger** para análise profunda de execução
+- **Use console.table** para arrays e objetos complexos
+- **Use console.time/timeEnd** para medição de performance
+
+```typescript
+// ✅ Exemplos de debugging eficiente
+console.time('user-creation');
+const user = await createUser(userData);
+console.timeEnd('user-creation');
+
+console.table(users); // Para arrays de objetos
+console.group('User Processing');
+console.log('Step 1:', step1Result);
+console.log('Step 2:', step2Result);
+console.groupEnd();
+
+// Para debugging profundo
+debugger; // Pausa execução no DevTools
+```
+
+### Tracing e Observabilidade
+- **Implemente distributed tracing** (OpenTelemetry, Jaeger)
+- **Use correlation IDs** para rastrear requests
+- **Monitore métricas** de performance e erro
+- **Configure alertas** para problemas críticos
+
+```typescript
+// ✅ Exemplo de tracing
+import { trace, context } from '@opentelemetry/api';
+
+async function processUser(userData: UserData): Promise<User> {
+  const tracer = trace.getTracer('user-service');
+  
+  return tracer.startActiveSpan('processUser', async (span) => {
+    try {
+      span.setAttributes({
+        'user.email': userData.email,
+        'user.role': userData.role
+      });
+      
+      const user = await createUser(userData);
+      span.setStatus({ code: SpanStatusCode.OK });
+      
+      return user;
+    } catch (error) {
+      span.setStatus({ 
+        code: SpanStatusCode.ERROR, 
+        message: error.message 
+      });
+      span.recordException(error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+```
+
+### Ferramentas de Monitoramento
+- **Datadog**: APM, logs, métricas e alertas
+- **Sentry**: Error tracking e performance monitoring
+- **New Relic**: Application performance monitoring
+- **Grafana + Prometheus**: Métricas customizadas
+
+```typescript
+// ✅ Exemplo de integração com Sentry
+import * as Sentry from '@sentry/node';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  tracesSampleRate: 1.0,
+});
+
+// Captura de erros automática
+try {
+  await riskyOperation();
+} catch (error) {
+  Sentry.captureException(error, {
+    tags: {
+      section: 'user-registration',
+      userId: user.id
+    },
+    extra: {
+      userData: sanitizeUserData(userData)
+    }
+  });
+  throw error;
+}
+```
+
+### Debugging de Performance
+- **Use profilers** para identificar gargalos
+- **Monitore memory leaks** com heap snapshots
+- **Analise bundle size** com webpack-bundle-analyzer
+- **Use Lighthouse** para performance web
+
+```typescript
+// ✅ Exemplo de profiling
+import { performance } from 'perf_hooks';
+
+async function debugPerformance() {
+  const start = performance.now();
+  
+  // Operação a ser medida
+  await heavyOperation();
+  
+  const end = performance.now();
+  const duration = end - start;
+  
+  if (duration > 1000) { // > 1 segundo
+    logger.warn('Slow operation detected', {
+      operation: 'heavyOperation',
+      duration: `${duration}ms`,
+      threshold: '1000ms'
+    });
+  }
+}
+```
+
+### Debugging de Estado
+- **Use Redux DevTools** para aplicações React/Redux
+- **Implemente state snapshots** para debugging
+- **Use time-travel debugging** quando possível
+- **Log state changes** com middleware
+
+```typescript
+// ✅ Exemplo de state debugging
+const stateLogger = (store: any) => (next: any) => (action: any) => {
+  console.group(`Action: ${action.type}`);
+  console.log('Previous State:', store.getState());
+  console.log('Action:', action);
+  
+  const result = next(action);
+  
+  console.log('Next State:', store.getState());
+  console.groupEnd();
+  
+  return result;
+};
+```
+
+## Checklist de Debugging Avançado
+
+### Preparação
+- [ ] **Ferramentas de debugging** instaladas e configuradas
+- [ ] **Logs estruturados** implementados
+- [ ] **Tracing distribuído** configurado
+- [ ] **Monitoramento** ativo e alertas configurados
+
+### Durante Debugging
+- [ ] **Logs contextuais** adicionados nos pontos críticos
+- [ ] **Métricas de performance** coletadas
+- [ ] **Estado da aplicação** capturado em snapshots
+- [ ] **Correlation IDs** rastreados através do sistema
+
+### Pós-Debugging
+- [ ] **Logs temporários** removidos
+- [ ] **Métricas de baseline** estabelecidas
+- [ ] **Alertas** ajustados baseados no aprendizado
+- [ ] **Documentação** atualizada com soluções encontradas

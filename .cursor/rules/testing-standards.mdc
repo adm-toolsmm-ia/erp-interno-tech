@@ -1,0 +1,343 @@
+---
+globs: "*.test.ts,*.spec.ts,*.test.js,*.spec.js"
+description: "Padrões de teste e qualidade de código"
+---
+
+# 🧪 Padrões de Teste
+
+## Estrutura de Testes
+- **Use AAA Pattern**: Arrange, Act, Assert
+- **Um teste, uma responsabilidade** - teste apenas um comportamento por vez
+- **Nomes descritivos** que explicam o que está sendo testado
+- **Organize testes por funcionalidade** ou componente
+
+## Tipos de Teste
+- **Unit Tests**: Teste funções/métodos isolados
+- **Integration Tests**: Teste integração entre componentes
+- **E2E Tests**: Teste fluxos completos do usuário
+- **Contract Tests**: Teste contratos entre serviços
+
+## Boas Práticas
+- **Teste comportamento, não implementação**
+- **Use mocks apenas quando necessário**
+- **Mantenha testes independentes** - não dependa de estado de outros testes
+- **Use factories/builders** para criar dados de teste
+- **Teste casos de sucesso E falha**
+
+## Cobertura de Testes
+- **Mantenha cobertura > 80%** para código crítico
+- **Teste caminhos felizes e de erro**
+- **Teste edge cases** e valores limite
+- **Teste validações e regras de negócio**
+
+## Estrutura de Arquivo de Teste
+```typescript
+describe('ComponentName', () => {
+  describe('methodName', () => {
+    it('should do something when condition is met', () => {
+      // Arrange
+      const input = 'test';
+      
+      // Act
+      const result = methodName(input);
+      
+      // Assert
+      expect(result).toBe('expected');
+    });
+  });
+});
+```
+
+## Mock e Stub
+- **Mock apenas dependências externas**
+- **Use jest.fn()** para funções mock
+- **Use jest.spyOn()** para espionar métodos
+- **Limpe mocks** entre testes
+- **Use factories** para dados de teste consistentes
+
+## Cobertura de Testes Obrigatória
+
+### Meta de Cobertura
+- **Cobertura mínima**: 80% para código crítico
+- **Cobertura de branches**: 70% mínimo
+- **Cobertura de funções**: 90% mínimo
+- **Cobertura de linhas**: 80% mínimo
+
+### Configuração de Cobertura
+```json
+// jest.config.js
+module.exports = {
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 90,
+      lines: 80,
+      statements: 80
+    }
+  },
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/*.stories.{ts,tsx}',
+    '!src/**/index.{ts,tsx}'
+  ]
+};
+```
+
+### CI/CD com Cobertura
+```yaml
+# .github/workflows/test.yml
+name: Tests and Coverage
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests with coverage
+        run: npm run test:ci
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          fail_ci_if_error: true
+```
+
+## Tipos de Teste por Camada
+
+### Unit Tests (70% dos testes)
+- **Teste funções isoladas**
+- **Mock todas as dependências**
+- **Foco em lógica de negócio**
+- **Execução rápida** (< 100ms por teste)
+
+```typescript
+// ✅ Exemplo de unit test
+describe('UserService', () => {
+  let userService: UserService;
+  let mockUserRepository: jest.Mocked<UserRepository>;
+  
+  beforeEach(() => {
+    mockUserRepository = {
+      findById: jest.fn(),
+      save: jest.fn(),
+      delete: jest.fn()
+    } as jest.Mocked<UserRepository>;
+    
+    userService = new UserService(mockUserRepository);
+  });
+  
+  describe('createUser', () => {
+    it('should create user successfully', async () => {
+      // Arrange
+      const userData = { email: 'test@example.com', name: 'Test User' };
+      const expectedUser = { id: '1', ...userData };
+      mockUserRepository.save.mockResolvedValue(expectedUser);
+      
+      // Act
+      const result = await userService.createUser(userData);
+      
+      // Assert
+      expect(result).toEqual(expectedUser);
+      expect(mockUserRepository.save).toHaveBeenCalledWith(userData);
+    });
+  });
+});
+```
+
+### Integration Tests (20% dos testes)
+- **Teste integração entre componentes**
+- **Use banco de dados de teste**
+- **Teste APIs completas**
+- **Execução média** (< 1s por teste)
+
+```typescript
+// ✅ Exemplo de integration test
+describe('User API Integration', () => {
+  let app: INestApplication;
+  let userRepository: Repository<User>;
+  
+  beforeAll(async () => {
+    const moduleFixture = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    
+    app = moduleFixture.createNestApplication();
+    userRepository = moduleFixture.get('UserRepository');
+    await app.init();
+  });
+  
+  afterAll(async () => {
+    await app.close();
+  });
+  
+  beforeEach(async () => {
+    await userRepository.clear();
+  });
+  
+  describe('POST /users', () => {
+    it('should create user and return 201', async () => {
+      const userData = { email: 'test@example.com', name: 'Test User' };
+      
+      const response = await request(app.getHttpServer())
+        .post('/users')
+        .send(userData)
+        .expect(201);
+      
+      expect(response.body).toMatchObject(userData);
+      
+      const user = await userRepository.findOne({ where: { email: userData.email } });
+      expect(user).toBeDefined();
+    });
+  });
+});
+```
+
+### E2E Tests (10% dos testes)
+- **Teste fluxos completos**
+- **Use ambiente realista**
+- **Teste UX completa**
+- **Execução lenta** (< 10s por teste)
+
+```typescript
+// ✅ Exemplo de E2E test
+describe('User Registration Flow', () => {
+  let page: Page;
+  let browser: Browser;
+  
+  beforeAll(async () => {
+    browser = await puppeteer.launch();
+    page = await browser.newPage();
+  });
+  
+  afterAll(async () => {
+    await browser.close();
+  });
+  
+  it('should complete user registration flow', async () => {
+    // Navigate to registration page
+    await page.goto('http://localhost:3000/register');
+    
+    // Fill registration form
+    await page.type('[data-testid="email"]', 'test@example.com');
+    await page.type('[data-testid="password"]', 'password123');
+    await page.type('[data-testid="confirm-password"]', 'password123');
+    
+    // Submit form
+    await page.click('[data-testid="submit-button"]');
+    
+    // Wait for success message
+    await page.waitForSelector('[data-testid="success-message"]');
+    
+    // Verify redirect to dashboard
+    expect(page.url()).toContain('/dashboard');
+  });
+});
+```
+
+## Ferramentas de Teste
+
+### Jest Configuration
+```javascript
+// jest.config.js
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
+  testMatch: [
+    '<rootDir>/src/**/__tests__/**/*.ts',
+    '<rootDir>/src/**/*.test.ts'
+  ],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/**/__tests__/**',
+    '!src/**/index.ts'
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 90,
+      lines: 80,
+      statements: 80
+    }
+  }
+};
+```
+
+### Test Utilities
+```typescript
+// src/test/test-utils.ts
+export class TestFactory {
+  static createUser(overrides: Partial<User> = {}): User {
+    return {
+      id: '1',
+      email: 'test@example.com',
+      name: 'Test User',
+      createdAt: new Date(),
+      ...overrides
+    };
+  }
+  
+  static createUserDto(overrides: Partial<CreateUserDto> = {}): CreateUserDto {
+    return {
+      email: 'test@example.com',
+      name: 'Test User',
+      password: 'password123',
+      ...overrides
+    };
+  }
+}
+
+export class MockRepository<T> {
+  private data: T[] = [];
+  
+  async findOne(where: any): Promise<T | null> {
+    return this.data.find(item => 
+      Object.keys(where).every(key => item[key] === where[key])
+    ) || null;
+  }
+  
+  async save(entity: T): Promise<T> {
+    this.data.push(entity);
+    return entity;
+  }
+  
+  async delete(id: string): Promise<void> {
+    this.data = this.data.filter(item => item['id'] !== id);
+  }
+}
+```
+
+## Checklist de Testes
+
+### Antes de Cada Commit
+- [ ] **Todos os testes** passando
+- [ ] **Cobertura mínima** atingida (80%)
+- [ ] **Testes de regressão** executados
+- [ ] **Performance dos testes** aceitável (< 30s total)
+
+### Configuração de Ambiente
+- [ ] **Jest configurado** com cobertura
+- [ ] **Banco de dados de teste** configurado
+- [ ] **Mocks** organizados e reutilizáveis
+- [ ] **CI/CD** configurado para testes
+
+### Qualidade dos Testes
+- [ ] **Nomes descritivos** para testes
+- [ ] **AAA pattern** seguido
+- [ ] **Mocks apropriados** (não over-mocking)
+- [ ] **Testes independentes** entre si
