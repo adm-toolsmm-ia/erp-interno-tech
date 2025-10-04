@@ -3,9 +3,19 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { extractTenantFromRequest } from '@/lib/tenant';
 import { createSuccessResponse, createErrorResponse, createValidationErrorResponse } from '@/lib/api-response';
-import { createClienteSchema, updateClienteSchema, paginationSchema, clienteFilterSchema } from '@/lib/validations';
+import { paginationSchema } from '@/lib/validations';
 import { AppError, handleError } from '@/lib/errors';
 import { logInfo, logError } from '@/lib/logger';
+
+// Schema para Status de Projeto
+const createStatusProjetoSchema = z.object({
+  nome: z.string().min(1, 'Nome é obrigatório'),
+  fase: z.string().optional(),
+  cor: z.string().regex(/^#[0-9A-F]{6}$/i, 'Cor deve ser um hex válido (ex: #FF0000)').optional(),
+  ordem: z.number().int().min(0).optional(),
+});
+
+const updateStatusProjetoSchema = createStatusProjetoSchema.partial();
 
 export async function GET(request: NextRequest) {
   const context = extractTenantFromRequest(request);
@@ -21,65 +31,50 @@ export async function GET(request: NextRequest) {
       sortOrder: searchParams.get('sortOrder'),
     });
 
-    const filterParams = clienteFilterSchema.parse({
-      clienteId: searchParams.get('clienteId'),
-      segmento: searchParams.get('segmento'),
-    });
-
-    const { page, limit, sortBy = 'createdAt', sortOrder } = paginationParams;
+    const { page, limit, sortBy = 'ordem', sortOrder } = paginationParams;
     const skip = (page - 1) * limit;
-    const orderBy = sortBy ? { [sortBy]: sortOrder } : { createdAt: 'desc' as const };
+    const orderBy = sortBy ? { [sortBy]: sortOrder } : { ordem: 'asc' as const };
 
     // Filtros
     const search = searchParams.get('search');
+    const fase = searchParams.get('fase');
     const where = {
       empresaId: context.empresaId,
-      deletedAt: null,
-      ...(filterParams.segmento && { segmento: filterParams.segmento }),
       ...(search && {
         OR: [
-          { razaoSocial: { contains: search, mode: 'insensitive' as const } },
-          { nomeFantasia: { contains: search, mode: 'insensitive' as const } },
-          { cnpj: { contains: search } },
+          { nome: { contains: search, mode: 'insensitive' as const } },
+          { fase: { contains: search, mode: 'insensitive' as const } },
         ],
       }),
+      ...(fase && { fase }),
     };
 
-    const [clientes, total] = await Promise.all([
-      prisma.cliente.findMany({
+    const [statusProjetos, total] = await Promise.all([
+      prisma.statusProjeto.findMany({
         where,
         orderBy,
         skip,
         take: limit,
         include: {
-          representantes: true,
-          setores: {
-            include: {
-              coordenador: { select: { id: true, nome: true } },
-              gerente: { select: { id: true, nome: true } },
-              keyUser: { select: { id: true, nome: true } },
-            },
-          },
           _count: {
             select: {
               projetos: true,
-              documentos: true,
             },
           },
         },
       }),
-      prisma.cliente.count({ where }),
+      prisma.statusProjeto.count({ where }),
     ]);
 
-    logInfo('Clientes listados', context, {
+    logInfo('Status de projetos listados', context, {
       total,
       page,
       limit,
-      filters: { search, segmento: filterParams.segmento },
+      filters: { search, fase },
     });
 
     return createSuccessResponse(
-      clientes,
+      statusProjetos,
       context,
       {
         page,
@@ -91,7 +86,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     const appError = handleError(error);
-    logError('Erro ao listar clientes', appError, context);
+    logError('Erro ao listar status de projetos', appError, context);
     return createErrorResponse(appError, context);
   }
 }
@@ -101,39 +96,34 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const validatedData = createClienteSchema.parse(body);
+    const validatedData = createStatusProjetoSchema.parse(body);
 
-    // Normalizar CNPJ (remover formatação)
-    const normalizedCnpj = validatedData.cnpj.replace(/\D/g, '');
-
-    // Verificar se CNPJ já existe na empresa
-    const existingCliente = await prisma.cliente.findFirst({
+    // Verificar se nome já existe na empresa
+    const existingStatus = await prisma.statusProjeto.findFirst({
       where: {
         empresaId: context.empresaId,
-        normalizedCnpj,
-        deletedAt: null,
+        nome: validatedData.nome,
       },
     });
 
-    if (existingCliente) {
-      throw new AppError('CNPJ já cadastrado para esta empresa', 409, 'CNPJ_EXISTS');
+    if (existingStatus) {
+      throw new AppError('Nome de status já existe', 409, 'STATUS_NAME_EXISTS');
     }
 
-    const cliente = await prisma.cliente.create({
+    const statusProjeto = await prisma.statusProjeto.create({
       data: {
         ...validatedData,
-        normalizedCnpj,
         empresaId: context.empresaId,
       },
     });
 
-    logInfo('Cliente criado', context, {
-      clienteId: cliente.id,
-      cnpj: cliente.cnpj,
-      razaoSocial: cliente.razaoSocial,
+    logInfo('Status de projeto criado', context, {
+      statusId: statusProjeto.id,
+      nome: statusProjeto.nome,
+      fase: statusProjeto.fase,
     });
 
-    return createSuccessResponse(cliente, context);
+    return createSuccessResponse(statusProjeto, context);
 
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -148,7 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     const appError = handleError(error);
-    logError('Erro ao criar cliente', appError, context);
+    logError('Erro ao criar status de projeto', appError, context);
     return createErrorResponse(appError, context);
   }
 }
