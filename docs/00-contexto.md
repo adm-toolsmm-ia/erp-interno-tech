@@ -141,16 +141,25 @@ enum OrcamentoStatus {
 model Empresa {
   id            String            @id @default(uuid())
   razaoSocial   String
-  nomeFantasia  String
+  nomeFantasia  String?
   cnpj          String            @unique
-  endereco      String
+  endereco      String?
+  telefone      String?
+  email         String?
+  website       String?
+  logo          String?
+  timezone      String            @default("America/Sao_Paulo")
+  moeda         String            @default("BRL")
+  formatoData   String            @default("DD/MM/YYYY")
 
   // Relacionamentos
-  produtos      ProdutoServico[]
-  usuarios      Usuario[]
-  clientes      Cliente[]
-  projetos      Projeto[]
-  fornecedores  Fornecedor[]
+  produtos              ProdutoServico[]
+  usuarios              Usuario[]
+  clientes              Cliente[]
+  projetos              Projeto[]
+  fornecedores          Fornecedor[]
+  statusProjetos        StatusProjeto[]
+  categoriasDocumento   CategoriaDocumento[]
 
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
@@ -184,9 +193,20 @@ model Cliente {
   empresa          Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   razaoSocial      String
+  nomeFantasia     String?
   cnpj             String
   normalizedCnpj   String
   segmento         String?
+  logradouro       String?
+  numero           String?
+  complemento      String?
+  bairro           String?
+  cidade           String?
+  estado           String?
+  cep              String?
+  telefone         String?
+  email            String?
+  website          String?
 
   representantes   Representante[]
   setores          SetorCliente[]
@@ -263,9 +283,15 @@ model Projeto {
   cliente       Cliente          @relation(fields: [clienteId], references: [id], onDelete: Restrict)
 
   assunto       String
+  descricao     String?
   statusId      String?
   status        StatusProjeto?   @relation(fields: [statusId], references: [id])
   dataEntrada   DateTime
+  dataInicio    DateTime?
+  dataFim       DateTime?
+  valorEstimado Decimal?
+  prioridade    String?
+  tags          String[]
 
   expectativa   String?
   objetivo      String?
@@ -329,9 +355,17 @@ model Orcamento {
   projetoId     String
   projeto       Projeto         @relation(fields: [projetoId], references: [id], onDelete: Cascade)
 
+  numero        String?
+  titulo        String?
+  descricao     String?
   status        OrcamentoStatus @default(ABERTO)
   moeda         String          @default("BRL")
   valorTotal    Decimal         @db.Decimal(18, 2) @default(0)
+  dataCriacao   DateTime        @default(now())
+  dataValidade  DateTime?
+  desconto      Decimal         @db.Decimal(18, 2) @default(0)
+  valorFinal    Decimal         @db.Decimal(18, 2) @default(0)
+  observacoes   String?
 
   fornecedorId  String?
   fornecedor    Fornecedor?     @relation(fields: [fornecedorId], references: [id])
@@ -464,6 +498,9 @@ model Documento {
   categoria       CategoriaDocumento? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
 
   titulo          String
+  descricao       String?
+  tags            String[]
+  metadata        Json?
   currentVersion  Int               @default(1)
 
   // Metadados de armazenamento
@@ -540,6 +577,9 @@ model StatusProjeto {
   id          String   @id @default(uuid())
   empresaId   String
   nome        String
+  empresa     String?
+  cor         String?
+  ordem       Int?
   fase        String?
 
   projetos    Projeto[]
@@ -552,6 +592,10 @@ model CategoriaDocumento {
   id          String   @id @default(uuid())
   empresaId   String
   nome        String
+  empresa     String?
+  descricao   String?
+  cor         String?
+  ordem       Int?
 
   documentos  Documento[]
 

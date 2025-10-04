@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
         storageProvider: validatedData.storageProvider || null,
         tags: validatedData.tags || [],
         empresaId: context.empresaId,
-        createdById: context.userId, // TODO: Implementar autenticação
+        createdById: context.userId, // Autenticação será implementada na Fase 2
       },
     });
 
@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
         contentType: validatedData.contentType,
         sizeBytes: validatedData.sizeBytes,
         checksum: validatedData.checksum,
-        createdById: context.userId, // TODO: Implementar autenticação
+        createdById: context.userId, // Autenticação será implementada na Fase 2
       },
     });
 

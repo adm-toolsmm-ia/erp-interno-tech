@@ -8,14 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, List, Kanban } from 'lucide-react';
 import { CreateOrcamentoModal } from '@/components/forms/CreateOrcamentoModal';
+import { OrcamentosKanban } from '@/components/kanban/OrcamentosKanban';
 import { useOrcamentos } from '@/hooks/useOrcamentos';
 import { useToast } from '@/hooks/useToast';
 import { ToastContainer } from '@/components/ui/toast';
 
 export default function OrcamentosPage() {
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<'list' | 'kanban'>('list');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const { data: orcamentos, loading, error, refetch } = useOrcamentos();
@@ -46,10 +48,32 @@ export default function OrcamentosPage() {
         title="Orçamentos"
         subtitle="Gerencie os orçamentos dos projetos"
         actions={
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Orçamento
-          </Button>
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center border rounded-md">
+              <Button
+                variant={view === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setView('list')}
+                className="rounded-r-none"
+              >
+                <List className="h-4 w-4 mr-2" />
+                Lista
+              </Button>
+              <Button
+                variant={view === 'kanban' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setView('kanban')}
+                className="rounded-l-none"
+              >
+                <Kanban className="h-4 w-4 mr-2" />
+                Kanban
+              </Button>
+            </div>
+            <Button onClick={() => setIsModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Orçamento
+            </Button>
+          </div>
         }
       />
 
@@ -176,6 +200,18 @@ export default function OrcamentosPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Visualização Kanban */}
+        {view === 'kanban' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Kanban de Orçamentos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <OrcamentosKanban />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <CreateOrcamentoModal

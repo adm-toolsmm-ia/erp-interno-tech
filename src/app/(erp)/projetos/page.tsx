@@ -10,8 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CreateProjetoModal } from '@/components/forms/CreateProjetoModal';
+import { EditProjetoDrawer } from '@/components/drawers/EditProjetoDrawer';
 import { useProjetos } from '@/hooks/useProjetos';
-import { ProjetosKanban } from '@/components/kanban/ProjetosKanban';
+import { ProjetosKanbanComplete } from '@/components/kanban/ProjetosKanbanComplete';
 
 interface Projeto {
   id: string;
@@ -233,7 +234,7 @@ export default function ProjetosPage() {
               <CardTitle>Kanban de Projetos</CardTitle>
             </CardHeader>
             <CardContent>
-              <ProjetosKanban />
+              <ProjetosKanbanComplete />
             </CardContent>
           </Card>
         )}
@@ -245,7 +246,7 @@ export default function ProjetosPage() {
         onSuccess={handleSuccess}
       />
 
-      <EditProjetoModal
+      <EditProjetoDrawer
         isOpen={isEditModalOpen}
         onClose={closeEditModal}
         projetoId={editingId}

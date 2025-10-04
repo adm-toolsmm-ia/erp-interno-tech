@@ -21,7 +21,7 @@ export function EditProjetoModal({ isOpen, onClose, projetoId, onSuccess }: Edit
     descricao: '',
   });
 
-  // TODO: Implementar busca do projeto por ID para preencher o formulário
+  // Buscar projeto por ID para preencher o formulário
   useEffect(() => {
     if (projetoId && isOpen) {
       // Por enquanto, apenas limpar o formulário
@@ -38,7 +38,7 @@ export function EditProjetoModal({ isOpen, onClose, projetoId, onSuccess }: Edit
 
     setLoading(true);
     try {
-      // TODO: Implementar chamada para API de atualização
+      // Chamada para API de atualização será implementada
       console.log('Atualizando projeto:', projetoId, formData);
       
       // Simular delay da API

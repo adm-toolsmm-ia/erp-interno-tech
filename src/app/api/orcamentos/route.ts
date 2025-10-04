@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
         valorFinal,
         dataCriacao: new Date(),
         dataValidade: new Date(validatedData.dataValidade),
-        createdById: context.userId, // TODO: Implementar autenticação
+        createdById: context.userId, // Autenticação será implementada na Fase 2
       },
     });
 

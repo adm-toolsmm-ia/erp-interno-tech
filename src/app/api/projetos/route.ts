@@ -5,7 +5,7 @@ import { extractTenantFromRequest } from '@/lib/tenant';
 import { createSuccessResponse, createErrorResponse, createValidationErrorResponse } from '@/lib/api-response';
 import { createProjetoSchema, updateProjetoSchema, paginationSchema, projetoFilterSchema } from '@/lib/validations';
 import { AppError, handleError } from '@/lib/errors';
-import { logInfo, logError } from '@/lib/logger';
+import { logBusinessEvent, logError } from '@/lib/structured-logger';
 
 // Configurar runtime para Node.js (necessário para Prisma)
 export const runtime = 'nodejs';

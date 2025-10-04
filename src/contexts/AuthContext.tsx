@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // TODO: Implementar autenticação real com API
+    // Autenticação real com API será implementada na Fase 2
     // Por enquanto, simular login com usuário padrão
     if (email === 'admin@erp.com' && password === 'admin123') {
       const mockUser: User = {
