@@ -1,0 +1,180 @@
+# 🚀 ERP Frontend V1C - Regras Obrigatórias
+
+## Princípio Central
+**V1C (V1 Completa) obrigatória**: Toda página documentada deve existir e ser funcional, sem menções a "MVP" ou "Fase 2" nas regras de UI.
+
+## Critérios de Aceitação Globais (CAG)
+
+### 1. Funcionalidade Completa
+- **TODAS** as páginas documentadas em `docs/01-modulos.md` devem existir e funcionar
+- **Botões primários** sempre abrem modal ou navegam para `/create`
+- **Validação Zod** obrigatória em todos os formulários
+- **Submit** persiste dados via API
+- **Toast** de sucesso/erro após operações
+- **Refresh** automático da view após mudanças
+
+### 2. Visualizações Condicionais
+- **Lista (Tabela)**: Padrão para todas as entidades
+- **Kanban**: APENAS quando o schema indicar `status/etapas` (ex: Projetos, Orçamentos)
+- **Toggle Lista ↔ Kanban** no cabeçalho quando aplicável
+
+### 3. Layout e Navegação
+- **Sidebar colapsável** e persistente (localStorage)
+- **Topbar** com título e slot de ações
+- **Breadcrumbs** hierárquicos (Empresa > Cliente > Projeto)
+- **Foco visível** em todos os elementos interativos
+- **ESC** sempre fecha modal/drawer
+- **Labels/ARIA** em todos os controles
+
+### 4. Proibições Estritas
+- ❌ **onClick={() => {}}** vazio - falhar lint/build
+- ❌ **Campos não documentados** - usar `// TODO(docs:<arquivo#linha>)`
+- ❌ **Rotas não documentadas** - validação automática obrigatória
+- ❌ **Menções "MVP/Fase 2"** em regras de UI
+
+### 5. Multi-Tenancy Obrigatória
+- **TODAS** as operações incluem `empresaId`
+- **TODAS** as APIs retornam `tenantId` no meta
+- **TODAS** as queries filtram por tenant
+- **NUNCA** expor dados de outras empresas
+
+### 6. Soft Delete Universal
+- **deletedAt** em todos os modelos
+- **Filtros deletedAt: null** em todas as queries
+- **Auditoria** de exclusões com `deletedById`
+
+### 7. Validação e Segurança
+- **Zod schemas** para todas as entradas
+- **Sanitização** de inputs perigosos
+- **Logs estruturados** com tenantId
+- **Middleware** com `x-internal-key` e `x-tenant-id`
+
+### 8. Observabilidade Mínima
+- **Health check** em `/api/health`
+- **Logs estruturados** com contexto
+- **Métricas** por tenant
+- **Error tracking** com stack traces
+
+## Checklist de Validação V1C
+
+### Antes de Cada Deploy
+- [ ] **Todas as rotas documentadas** existem e funcionam
+- [ ] **Botões "Novo"** abrem modal/navegam + validam + persistem + toast
+- [ ] **Kanban** apenas onde schema tem status/etapas
+- [ ] **Multi-tenancy** funcionando em todas as operações
+- [ ] **Soft delete** aplicado consistentemente
+- [ ] **Logs estruturados** com tenantId
+- [ ] **Zero onClick vazios** no código
+- [ ] **Validação Zod** em todos os forms
+- [ ] **Health check** respondendo
+- [ ] **Middleware** bloqueando requests inválidos
+
+### Validação Automática
+```bash
+npm run validate:routes    # Todas as rotas documentadas existem
+npm run check:onclick      # Zero onClick vazios
+npm run test:e2e          # Smoke tests básicos
+npm run check:all         # Todos os checks acima
+```
+
+## Exemplos de Implementação
+
+### Botão "Novo" Funcional
+```typescript
+// ✅ Correto - Botão funcional
+<Button onClick={() => setShowCreateModal(true)}>
+  Novo Projeto
+</Button>
+
+// ❌ Proibido - onClick vazio
+<Button onClick={() => {}}>
+  Novo Projeto
+</Button>
+```
+
+### Kanban Condicional
+```typescript
+// ✅ Apenas quando schema tem status
+{hasStatusField && (
+  <div className="flex gap-2">
+    <Button 
+      variant={view === 'list' ? 'default' : 'outline'}
+      onClick={() => setView('list')}
+    >
+      Lista
+    </Button>
+    <Button 
+      variant={view === 'kanban' ? 'default' : 'outline'}
+      onClick={() => setView('kanban')}
+    >
+      Kanban
+    </Button>
+  </div>
+)}
+```
+
+### Multi-Tenancy Obrigatória
+```typescript
+// ✅ Todas as queries incluem empresaId
+const projetos = await prisma.projeto.findMany({
+  where: {
+    empresaId: req.empresaId, // OBRIGATÓRIO
+    deletedAt: null, // OBRIGATÓRIO
+  }
+});
+
+// ✅ Resposta inclui tenantId no meta
+return Response.json({
+  data: projetos,
+  meta: {
+    tenantId: req.empresaId,
+    requestId: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    version: "1.0.0"
+  }
+});
+```
+
+## Penalidades por Não Conformidade
+
+### Build Fails
+- **onClick vazio** → Falha no lint/build
+- **Rotas faltando** → Falha no `validate:routes`
+- **Multi-tenancy ausente** → Falha nos testes
+
+### Code Review Blocker
+- **Campos não documentados** → PR rejeitado
+- **Menções "MVP"** → PR rejeitado
+- **Logs sem tenantId** → PR rejeitado
+
+## Integração com CI/CD
+
+### Pipeline Obrigatório
+```yaml
+- name: Validate V1C
+  run: |
+    npm run validate:routes
+    npm run check:onclick
+    npm run test:e2e
+    npm run lint
+    npm run type-check
+```
+
+### Branch Protection
+- **Status checks** devem passar
+- **Code review** obrigatório
+- **Conformidade V1C** validada
+
+## Escalabilidade V1C
+
+### Próximas Versões
+- **V1.1**: Adicionar novos módulos documentados
+- **V1.2**: Melhorias de performance
+- **V1.3**: Integrações externas
+- **V2.0**: Refatorações arquiteturais
+
+### Manutenção
+- **Documentação viva** sempre atualizada
+- **Testes regressivos** para V1C
+- **Monitoramento** de conformidade
+- **Feedback loop** contínuo

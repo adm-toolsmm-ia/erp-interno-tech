@@ -14,6 +14,7 @@ description: "Índice consolidado das regras do Cursor para ERP Interno Tech"
 - [Development](mdc:.cursor/rules/development.mdc) - Commits, branches, testes
 
 ### UX/UI e Componentes
+- [Frontend V1C](mdc:.cursor/rules/erp-frontend-v1c.mdc) - Regras V1C obrigatórias, critérios de aceitação
 - [UX/UI Guidelines](mdc:.cursor/rules/erp-ux-consolidated.mdc) - Tokens, layout, responsividade
 - [UI Components](mdc:.cursor/rules/erp-ux-components.mdc) - Glossário de componentes
 - [UX Flows](mdc:.cursor/rules/erp-ux-flows.mdc) - Comportamentos e interações
