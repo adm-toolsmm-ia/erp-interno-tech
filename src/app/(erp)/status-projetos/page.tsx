@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Search, Filter, List, Kanban } from 'lucide-react';
 import Topbar from '@/components/layout/Topbar';
 import Breadcrumbs from '@/components/layout/Breadcrumbs';
 import { Button } from '@/components/ui/button';
@@ -9,35 +8,45 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CreateClienteModal } from '@/components/forms/CreateClienteModal';
-import { useClientes } from '@/hooks/useClientes';
+import { Plus, Search, Filter } from 'lucide-react';
+import { CreateStatusProjetoModal } from '@/components/forms/CreateStatusProjetoModal';
+import { useStatusProjetos } from '@/hooks/useStatusProjetos';
 
-export default function ClientesPage() {
+export default function StatusProjetosPage() {
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<'list' | 'kanban'>('list');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  const { data: clientes, loading, error, refetch } = useClientes();
+  const { data: statusProjetos, loading, error, refetch } = useStatusProjetos();
 
   const handleSuccess = () => {
     refetch(); // Recarregar lista após criação
   };
 
-  // TODO: Implementar drawer de edição
-
   const breadcrumbItems = [
-    { label: 'Clientes' }
+    { label: 'Configurações' },
+    { label: 'Status de Projetos' }
   ];
+
+  const getFaseColor = (fase: string) => {
+    switch (fase) {
+      case 'INICIO': return 'bg-blue-100 text-blue-800';
+      case 'DESENVOLVIMENTO': return 'bg-yellow-100 text-yellow-800';
+      case 'TESTE': return 'bg-orange-100 text-orange-800';
+      case 'ENTREGA': return 'bg-purple-100 text-purple-800';
+      case 'FINALIZADO': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   return (
     <div className="space-y-6">
       <Topbar
-        title="Clientes"
-        subtitle="Gerencie os clientes da empresa"
+        title="Status de Projetos"
+        subtitle="Configure os status e fases dos projetos"
         actions={
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Novo Cliente
+            Novo Status
           </Button>
         }
       />
@@ -50,27 +59,14 @@ export default function ClientesPage() {
         {/* Filtros e Busca */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Filtros</CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant={view === 'list' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setView('list')}
-                >
-                  <List className="h-4 w-4 mr-2" />
-                  Lista
-                </Button>
-                {/* Kanban não disponível para clientes (sem status) */}
-              </div>
-            </div>
+            <CardTitle className="text-lg">Filtros</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Buscar por razão social, nome fantasia ou CNPJ..."
+                  placeholder="Buscar por nome ou fase..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10"
@@ -84,77 +80,83 @@ export default function ClientesPage() {
           </CardContent>
         </Card>
 
-        {/* Lista de Clientes */}
+        {/* Lista de Status */}
         <Card>
           <CardHeader>
-            <CardTitle>Clientes ({clientes?.length || 0})</CardTitle>
+            <CardTitle>Status de Projetos ({statusProjetos?.length || 0})</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-2 text-gray-500">Carregando clientes...</p>
+                <p className="mt-2 text-gray-500">Carregando status...</p>
               </div>
             ) : error ? (
               <div className="text-center py-8">
-                <p className="text-red-500 mb-4">Erro ao carregar clientes</p>
+                <p className="text-red-500 mb-4">Erro ao carregar status</p>
                 <Button onClick={() => refetch()}>
                   Tentar Novamente
                 </Button>
               </div>
-            ) : !clientes || clientes.length === 0 ? (
+            ) : !statusProjetos || statusProjetos.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">Nenhum cliente encontrado</p>
+                <p className="text-gray-500 mb-4">Nenhum status encontrado</p>
                 <Button onClick={() => setIsModalOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Criar Primeiro Cliente
+                  Criar Primeiro Status
                 </Button>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Razão Social</TableHead>
-                    <TableHead>Nome Fantasia</TableHead>
-                    <TableHead>CNPJ</TableHead>
-                    <TableHead>E-mail</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Data Criação</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Fase</TableHead>
+                    <TableHead>Ordem</TableHead>
+                    <TableHead>Cor</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {clientes.map((cliente) => (
+                  {statusProjetos.map((status) => (
                     <TableRow 
-                      key={cliente.id}
+                      key={status.id}
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => console.log('Editar cliente', cliente.id)}
+                      onClick={() => console.log('Editar status', status.id)}
                     >
                       <TableCell className="font-medium">
-                        {cliente.razaoSocial}
+                        {status.nome}
                       </TableCell>
                       <TableCell>
-                        {cliente.nomeFantasia || '-'}
+                        <Badge className={getFaseColor(status.fase || '')}>
+                          {status.fase || '-'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        {cliente.cnpj}
+                        <Badge variant="outline">{status.ordem || '-'}</Badge>
                       </TableCell>
                       <TableCell>
-                        {cliente.email || '-'}
+                        <div className="flex items-center space-x-2">
+                          <div 
+                            className="w-4 h-4 rounded-full border"
+                            style={{ backgroundColor: status.cor || '#3B82F6' }}
+                          />
+                          <span className="text-sm text-gray-600">{status.cor || '#3B82F6'}</span>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        {cliente.telefone || '-'}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(cliente.createdAt).toLocaleDateString('pt-BR')}
+                        <Badge variant={status.ativo ? "default" : "secondary"}>
+                          {status.ativo ? 'Ativo' : 'Inativo'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Button variant="ghost" size="sm">
-                            Ver
-                          </Button>
-                          <Button variant="ghost" size="sm">
                             Editar
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-600">
+                            Excluir
                           </Button>
                         </div>
                       </TableCell>
@@ -167,7 +169,7 @@ export default function ClientesPage() {
         </Card>
       </div>
 
-      <CreateClienteModal
+      <CreateStatusProjetoModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSuccess}

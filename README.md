@@ -1,165 +1,245 @@
-# 🏢 ERP Interno Tech
+# ERP Interno Tech
 
-ERP interno da empresa Tech em fase de MVP, desenvolvido com Next.js 15, Prisma, Supabase e Tailwind CSS.
+Sistema ERP multi-tenant desenvolvido com Next.js 15, Prisma, Supabase e TypeScript, seguindo padrões **V1C (V1 Completa)**.
 
 ## 🚀 Funcionalidades Atuais
 
-- **Multi-tenancy** rigorosa com isolamento de dados
-- **Soft delete** universal em todos os modelos
-- **CRUDs** para empresas, clientes, projetos, documentos e orçamentos
-- **Dashboards** essenciais com métricas de negócio
-- **Documentos** versionados com busca semântica
-- **Orçamentos** com workflow de aprovação
-- **Observabilidade** mínima com health checks
+- ✅ **Layout moderno** com Sidebar colapsável e Topbar
+- ✅ **Multi-tenancy** rigoroso com isolamento por `empresaId`
+- ✅ **APIs REST** completas para todas as entidades
+- ✅ **Validação Zod** em todos os formulários
+- ✅ **Soft Delete** universal com auditoria
+- ✅ **Logs estruturados** com contexto de tenant
+- ✅ **Health Check** com verificação de banco
+- ✅ **Middleware de segurança** com headers obrigatórios
+- ✅ **Guardrails de qualidade** (lint, validação de rotas, onClick)
 
-## 🛠️ Tecnologias
-
-- **Frontend**: Next.js 15 (App Router), Tailwind CSS, Shadcn/UI
-- **Backend**: Supabase (PostgreSQL + Storage + Edge Functions)
-- **ORM**: Prisma com multi-tenancy
-- **Deploy**: Vercel (Prod, Preview, Dev)
-- **IA**: Embeddings com pgvector (Fase 2)
-
-## 📚 Documentação
-
-### Contexto e Arquitetura
-- [📄 Contexto Completo](docs/00-contexto.md) - PRD, schema, fluxos
-- [📋 Módulos](docs/01-modulos.md) - Detalhes por módulo
-- [🔒 Segurança](docs/02-seguranca.md) - Estratégia de auth/RBAC
-- [📊 Observabilidade](docs/03-observabilidade.md) - Logs, métricas, tracing
-- [🚀 Roadmap](docs/04-roadmap.md) - Evolução técnica
-
-### Regras do Cursor
-- [🎯 Índice Consolidado](.cursor/rules/_index.mdc) - Regras práticas
-- [💻 Desenvolvimento](.cursor/rules/development.mdc) - Commits, branches, testes
-- [🏗️ Arquitetura](.cursor/rules/architecture.mdc) - Multi-tenancy, padrões
-- [🗄️ Database](.cursor/rules/database.mdc) - Prisma, seeds, migrations
-- [🔒 Segurança](.cursor/rules/security.mdc) - Validações, auditoria
-- [🚀 CI/CD](.cursor/rules/ci-cd.mdc) - Pipelines, deploy, monitoramento
-
-## ⚡ Quick Start
+## 📦 Instalação
 
 ```bash
-# 1. Clone o repositório
-git clone https://github.com/adm-toolsmm-ia/erp-interno-tech.git
+# Clone o repositório
+git clone <repo-url>
 cd erp-interno-tech
 
-# 2. Instale as dependências
+# Instale dependências
 npm install
 
-# 3. Configure as variáveis de ambiente
-cp .env.example .env.local
-# Edite .env.local com suas credenciais
+# Configure variáveis de ambiente
+cp .env.example .env
+# Edite .env com suas configurações
 
-# 4. Execute as migrations
+# Execute migrações
 npx prisma migrate dev
 
-# 5. Execute o projeto
+# Execute seeds (opcional)
+npm run db:seed
+
+# Inicie o servidor de desenvolvimento
 npm run dev
 ```
 
-## 🏗️ Estrutura do Projeto
+## 🔧 Configurações de Ambiente
+
+```bash
+# .env
+DATABASE_URL="postgresql://user:password@localhost:5432/erp_db"
+SUPABASE_URL="your_supabase_url"
+SUPABASE_ANON_KEY="your_anon_key"
+INTERNAL_API_KEY="your_internal_api_key"
+ALLOWED_ORIGINS="http://localhost:3000"
+NODE_ENV="development"
+```
+
+## 📖 Como Usar
+
+### Scripts Disponíveis
+
+```bash
+# Desenvolvimento
+npm run dev              # Servidor de desenvolvimento
+npm run build            # Build de produção
+npm run start            # Servidor de produção
+
+# Qualidade de Código
+npm run type-check       # Verificação de tipos TypeScript
+npm run lint             # ESLint
+npm run lint:fix         # Corrigir problemas de lint
+npm run format           # Prettier
+npm run format:check     # Verificar formatação
+
+# Testes
+npm run test             # Executar testes
+npm run test:ci          # Testes para CI
+npm run test:coverage    # Testes com cobertura
+
+# Validações V1C
+npm run validate:routes  # Verificar se todas as rotas documentadas existem
+npm run check:onclick    # Verificar onClick vazios
+npm run check:all        # Todas as validações V1C
+
+# Auditoria
+npm run audit            # Auditoria de dependências
+npm run audit:fix        # Corrigir vulnerabilidades
+npm run audit:ci         # Auditoria para CI
+
+# Banco de Dados
+npm run db:seed          # Executar seeds
+```
+
+### Estrutura do Projeto
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── api/               # API Routes
-│   │   ├── health/        # Health checks
-│   │   ├── empresas/      # CRUD empresas
-│   │   ├── clientes/      # CRUD clientes
-│   │   ├── projetos/      # CRUD projetos
-│   │   ├── documentos/    # CRUD documentos
-│   │   └── orcamentos/    # CRUD orçamentos
-│   └── (dashboard)/       # Páginas do dashboard
-├── components/            # Componentes React
-│   ├── ui/               # Shadcn/UI components
-│   ├── forms/            # Formulários específicos
-│   ├── tables/           # Tabelas e listas
-│   ├── modals/           # Modais de criação
-│   ├── drawers/          # Drawers de edição
-│   └── dashboards/       # Visões 360º
-├── lib/                  # Utilitários e configurações
-│   ├── prisma.ts         # Cliente Prisma
-│   ├── supabase.ts       # Cliente Supabase
-│   └── utils.ts          # Utilitários gerais
-├── hooks/                # Hooks customizados
-│   ├── use-tenant.ts     # Hook de multi-tenancy
-│   └── use-crud.ts       # Hook de CRUD
-└── types/                # Tipos TypeScript
-    ├── api.ts            # Tipos de API
-    └── database.ts       # Tipos de banco
+├── app/
+│   ├── (erp)/           # Rotas do ERP com layout
+│   │   ├── clientes/    # Módulo de clientes
+│   │   ├── projetos/    # Módulo de projetos
+│   │   └── dashboard/   # Dashboard principal
+│   └── api/             # APIs REST
+│       ├── clientes/    # API de clientes
+│       ├── projetos/    # API de projetos
+│       └── health/      # Health check
+├── components/
+│   ├── layout/          # Componentes de layout
+│   └── ui/              # Componentes UI reutilizáveis
+├── lib/                 # Utilitários e configurações
+└── config/              # Configurações (navegação, rotas)
 ```
 
-## 🎯 Princípios Fundamentais
+## 🎯 Exemplos de Uso
 
-### 1. Multi-Tenancy Rigorosa
-- **TODAS** as operações incluem `empresaId`
-- **TODAS** as queries filtram por tenant
-- **NUNCA** expor dados de outras empresas
+### Criando um Cliente
 
-### 2. Soft Delete Universal
-- **TODOS** os modelos têm `deletedAt`
-- **TODAS** as queries filtram `deletedAt: null`
-- **NUNCA** deletar dados permanentemente
+```typescript
+// API Call
+const response = await fetch('/api/clientes', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-internal-key': process.env.INTERNAL_API_KEY,
+    'x-tenant-id': empresaId,
+  },
+  body: JSON.stringify({
+    razaoSocial: 'Empresa Exemplo LTDA',
+    cnpj: '12345678000195',
+    logradouro: 'Rua das Flores, 123',
+    bairro: 'Centro',
+    cidade: 'São Paulo',
+    estado: 'SP',
+    cep: '01234567',
+  }),
+});
+```
 
-### 3. Observabilidade Mínima
-- Endpoint `/api/health` obrigatório
-- Logs estruturados em console
-- Métricas básicas de performance
+### Buscando Projetos com Filtros
 
-### 4. Testes Obrigatórios
-- Testes unitários para CRUDs
-- Testes de multi-tenancy
-- Testes de soft delete
-- Testes de validações
+```typescript
+const response = await fetch('/api/projetos?search=desenvolvimento&prioridade=ALTA&page=1&limit=20', {
+  headers: {
+    'x-internal-key': process.env.INTERNAL_API_KEY,
+    'x-tenant-id': empresaId,
+  },
+});
+```
+
+## 🔗 Dependências Principais
+
+- **Next.js 15** - Framework React com App Router
+- **Prisma** - ORM e migrações de banco
+- **Supabase** - Banco PostgreSQL e autenticação
+- **TypeScript** - Tipagem estática
+- **Zod** - Validação de schemas
+- **Tailwind CSS** - Estilização
+- **Lucide React** - Ícones
+- **Radix UI** - Componentes acessíveis
+
+## 📚 Documentação Adicional
+
+### Regras e Padrões
+- [Regras V1C](.cursor/rules/erp-frontend-v1c.mdc) - Critérios de aceitação obrigatórios
+- [UX/UI Guidelines](.cursor/rules/erp-ux-consolidated.mdc) - Padrões de interface
+- [Padrões de Commit](.cursor/rules/erp-commit-standards.mdc) - Convenções de commit
+- [Multi-tenancy](.cursor/rules/erp-multi-tenant.mdc) - Regras de isolamento
+
+### Documentação de Negócio
+- [Contexto Completo](docs/00-contexto.md) - PRD, schema, fluxos
+- [Módulos](docs/01-modulos.md) - Detalhes por módulo
+- [Segurança](docs/02-seguranca.md) - Estratégia de auth/RBAC
+- [Observabilidade](docs/03-observabilidade.md) - Logs, métricas, tracing
+
+### Validações V1C
+
+O projeto segue rigorosamente os **Critérios de Aceitação Globais (CAG)**:
+
+- ✅ **Todas as páginas documentadas** existem e funcionam
+- ✅ **Botões primários** abrem modal/navegam + validam + persistem + toast
+- ✅ **Kanban apenas** onde schema tem status/etapas
+- ✅ **Multi-tenancy** funcionando em todas as operações
+- ✅ **Soft delete** aplicado consistentemente
+- ✅ **Logs estruturados** com tenantId
+- ✅ **Zero onClick vazios** no código
+- ✅ **Validação Zod** em todos os forms
+- ✅ **Health check** respondendo
+- ✅ **Middleware** bloqueando requests inválidos
 
 ## 🚀 Deploy
 
-### Ambientes
-- **Desenvolvimento**: Deploy automático em `develop`
-- **Preview/Homologação**: Deploy automático em PRs
-- **Produção**: Deploy controlado em `main`
+### Vercel (Recomendado)
 
-### Comandos
 ```bash
-# Deploy para preview
-npm run deploy:preview
+# Deploy automático via GitHub
+git push origin main
 
-# Deploy para produção
-npm run deploy:production
+# Deploy manual
+npm run build
+vercel --prod
 ```
 
-## 📊 Status do Projeto
+### Variáveis de Ambiente (Produção)
 
-### ✅ Concluído
-- [x] Arquitetura base definida
-- [x] Regras do Cursor implementadas
-- [x] Padrões de commit automatizados
-- [x] Documentação completa
-- [x] Estrutura de pastas organizada
+Configure no painel da Vercel:
+- `DATABASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `INTERNAL_API_KEY`
+- `ALLOWED_ORIGINS`
 
-### 🚧 Em Desenvolvimento
-- [ ] Schema Prisma completo
-- [ ] APIs de todos os módulos
-- [ ] UI/UX consistente
-- [ ] Testes unitários
-- [ ] Deploy automático
+## 🛠️ Desenvolvimento
 
-### 📋 Próximos Passos
-- [ ] Implementar CRUDs básicos
-- [ ] Configurar multi-tenancy
-- [ ] Implementar soft delete
-- [ ] Criar dashboards essenciais
-- [ ] Configurar observabilidade
+### Workflow V1C
 
-## 🤝 Contribuição
+1. **Sempre implementar** uma funcionalidade por vez
+2. **Seguir** arquitetura e padrões validados
+3. **Incluir** testes unitários e de integração
+4. **Garantir** SRP (Single Responsibility Principle)
+5. **Validar** com `npm run check:all`
 
-1. Siga os [padrões de commit](.cursor/rules/development.mdc)
-2. Use as [regras do Cursor](.cursor/rules/_index.mdc)
-3. Implemente [testes unitários](.cursor/rules/development.mdc)
-4. Mantenha [multi-tenancy](.cursor/rules/architecture.mdc)
-5. Aplique [soft delete](.cursor/rules/architecture.mdc)
+### Branch Protection
 
-## 📞 Suporte
+- **Revisão obrigatória** antes do merge
+- **Status checks** devem passar
+- **Conformidade V1C** validada
+- **Commits** seguem convenção obrigatória
 
-Para dúvidas ou suporte, consulte a [documentação completa](docs/00-contexto.md) ou entre em contato com a equipe de desenvolvimento.
+## 📊 Monitoramento
+
+- **Health Check**: `/api/health`
+- **Logs**: Estruturados com tenantId
+- **Métricas**: Por tenant
+- **Error Tracking**: Com stack traces
+
+## 🔒 Segurança
+
+- **Multi-tenancy** rigoroso
+- **Headers de segurança** obrigatórios
+- **Validação** de entrada com Zod
+- **Auditoria** de todas as operações
+- **Soft delete** para recuperação
+
+## 📈 Próximos Passos
+
+- [ ] Implementar autenticação JWT
+- [ ] Adicionar testes E2E
+- [ ] Implementar Kanban drag&drop
+- [ ] Adicionar métricas avançadas
+- [ ] Implementar busca semântica com IA

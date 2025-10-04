@@ -1,11 +1,33 @@
+'use client';
+
 import { ReactNode } from 'react';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { LoginForm } from '@/components/auth/LoginForm';
 import Sidebar from '@/components/layout/Sidebar';
 
 interface ErpLayoutProps {
   children: ReactNode;
 }
 
-export default function ErpLayout({ children }: ErpLayoutProps) {
+function ErpContent({ children }: ErpLayoutProps) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-500">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginForm />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
@@ -19,5 +41,13 @@ export default function ErpLayout({ children }: ErpLayoutProps) {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function ErpLayout({ children }: ErpLayoutProps) {
+  return (
+    <AuthProvider>
+      <ErpContent>{children}</ErpContent>
+    </AuthProvider>
   );
 }

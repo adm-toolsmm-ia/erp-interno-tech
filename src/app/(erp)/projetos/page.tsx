@@ -1,21 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { Plus, Search, Filter, List, Kanban } from 'lucide-react';
+import Topbar from '@/components/layout/Topbar';
+import Breadcrumbs from '@/components/layout/Breadcrumbs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CreateProjetoModal } from '@/components/forms/CreateProjetoModal';
+import { useProjetos } from '@/hooks/useProjetos';
+import { ProjetosKanban } from '@/components/kanban/ProjetosKanban';
 
 interface Projeto {
   id: string;
   assunto: string;
   descricao?: string;
   dataEntrada: string;
-  dataInicio?: string;
-  dataFim?: string;
   prioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
-  tags: string[];
   cliente: {
     id: string;
     razaoSocial: string;
@@ -27,14 +30,6 @@ interface Projeto {
     fase?: string;
     cor?: string;
   };
-  gerente?: {
-    id: string;
-    nome: string;
-  };
-  vendedor?: {
-    id: string;
-    nome: string;
-  };
   _count: {
     documentos: number;
     orcamentos: number;
@@ -43,190 +38,201 @@ interface Projeto {
   };
 }
 
-const prioridadeColors = {
-  BAIXA: 'bg-gray-100 text-gray-800',
-  MEDIA: 'bg-blue-100 text-blue-800',
-  ALTA: 'bg-orange-100 text-orange-800',
-  URGENTE: 'bg-red-100 text-red-800',
-};
-
 export default function ProjetosPage() {
-  const [projetos, setProjetos] = useState<Projeto[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<'list' | 'kanban'>('list');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const { data: projetos, loading, error, refetch } = useProjetos();
 
-  useEffect(() => {
-    fetchProjetos();
-  }, []);
+  const handleSuccess = () => {
+    refetch(); // Recarregar lista após criação
+  };
 
-  const fetchProjetos = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/projetos', {
-        headers: {
-          'x-tenant-id': '12345678-1234-1234-1234-123456789012', // TODO: Pegar do contexto
-          'x-internal-key': process.env.NEXT_PUBLIC_INTERNAL_KEY || 'dev-key',
-        },
-      });
+  // TODO: Implementar drawer de edição
+  // TODO: Implementar Kanban (projetos têm status)
 
-      if (!response.ok) {
-        throw new Error('Erro ao carregar projetos');
-      }
+  const breadcrumbItems = [
+    { label: 'Projetos' }
+  ];
 
-      const data = await response.json();
-      setProjetos(data.data);
-    } catch (error) {
-      console.error('Erro:', error);
-    } finally {
-      setLoading(false);
+  const getPrioridadeColor = (prioridade: string) => {
+    switch (prioridade) {
+      case 'URGENTE': return 'bg-red-100 text-red-800';
+      case 'ALTA': return 'bg-orange-100 text-orange-800';
+      case 'MEDIA': return 'bg-yellow-100 text-yellow-800';
+      case 'BAIXA': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const filteredProjetos = projetos.filter(projeto =>
-    projeto.assunto.toLowerCase().includes(search.toLowerCase()) ||
-    projeto.cliente.razaoSocial.toLowerCase().includes(search.toLowerCase()) ||
-    projeto.cliente.nomeFantasia?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Projetos</h1>
-        </div>
-        <div className="grid gap-4">
-          {[...Array(5)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Projetos</h1>
-        <Button>Novo Projeto</Button>
+      <Topbar
+        title="Projetos"
+        subtitle="Gerencie os projetos da empresa"
+        actions={
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Projeto
+          </Button>
+        }
+      />
+
+      <div className="px-6">
+        <Breadcrumbs items={breadcrumbItems} />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Projetos</CardTitle>
-          <div className="flex gap-4">
-            <Input
-              placeholder="Buscar projetos..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredProjetos.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">Nenhum projeto encontrado</p>
+      <div className="px-6 space-y-4">
+        {/* Filtros e Busca */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Filtros</CardTitle>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant={view === 'list' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setView('list')}
+                >
+                  <List className="h-4 w-4 mr-2" />
+                  Lista
+                </Button>
+                <Button
+                  variant={view === 'kanban' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setView('kanban')}
+                >
+                  <Kanban className="h-4 w-4 mr-2" />
+                  Kanban
+                </Button>
+              </div>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Assunto</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead>Data Entrada</TableHead>
-                  <TableHead>Responsáveis</TableHead>
-                  <TableHead>Progresso</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProjetos.map((projeto) => (
-                  <TableRow key={projeto.id}>
-                    <TableCell className="font-medium">
-                      <div>
-                        <div className="font-medium">{projeto.assunto}</div>
-                        {projeto.descricao && (
-                          <div className="text-sm text-gray-500 truncate max-w-xs">
-                            {projeto.descricao}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{projeto.cliente.razaoSocial}</div>
-                        {projeto.cliente.nomeFantasia && (
-                          <div className="text-sm text-gray-500">{projeto.cliente.nomeFantasia}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {projeto.status ? (
-                        <Badge 
-                          variant="secondary"
-                          style={{ backgroundColor: projeto.status.cor + '20', color: projeto.status.cor }}
-                        >
-                          {projeto.status.nome}
-                        </Badge>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        className={prioridadeColors[projeto.prioridade]}
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar por assunto, descrição ou cliente..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                Filtros
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lista ou Kanban de Projetos */}
+        {view === 'list' ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Projetos ({projetos?.length || 0})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-500">Carregando projetos...</p>
+                </div>
+              ) : !projetos || projetos.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">Nenhum projeto encontrado</p>
+                  <Button onClick={() => setIsModalOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Criar Primeiro Projeto
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Assunto</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Prioridade</TableHead>
+                      <TableHead>Data Entrada</TableHead>
+                      <TableHead>Documentos</TableHead>
+                      <TableHead>Orçamentos</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {projetos.map((projeto) => (
+                      <TableRow 
+                        key={projeto.id}
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => console.log('Editar projeto', projeto.id)}
                       >
-                        {projeto.prioridade}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(projeto.dataEntrada).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {projeto.gerente && (
-                          <div className="text-sm">
-                            <span className="text-gray-500">Gerente:</span> {projeto.gerente.nome}
+                        <TableCell className="font-medium">
+                          {projeto.assunto}
+                        </TableCell>
+                        <TableCell>
+                          {projeto.cliente.razaoSocial}
+                        </TableCell>
+                        <TableCell>
+                          {projeto.status ? (
+                            <Badge 
+                              variant="secondary"
+                              style={{ backgroundColor: projeto.status.cor }}
+                            >
+                              {projeto.status.nome}
+                            </Badge>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getPrioridadeColor(projeto.prioridade)}>
+                            {projeto.prioridade}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(projeto.dataEntrada).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{projeto._count.documentos}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{projeto._count.orcamentos}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button variant="ghost" size="sm">
+                              Ver
+                            </Button>
+                            <Button variant="ghost" size="sm">
+                              Editar
+                            </Button>
                           </div>
-                        )}
-                        {projeto.vendedor && (
-                          <div className="text-sm">
-                            <span className="text-gray-500">Vendedor:</span> {projeto.vendedor.nome}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Badge variant="outline">{projeto._count.documentos} docs</Badge>
-                        <Badge variant="outline">{projeto._count.orcamentos} orç.</Badge>
-                        <Badge variant="outline">{projeto._count.atividades} ativ.</Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          Ver
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          Editar
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Kanban de Projetos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ProjetosKanban />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <CreateProjetoModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 }
