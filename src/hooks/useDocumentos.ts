@@ -6,13 +6,9 @@ export interface Documento {
   id: string;
   titulo: string;
   descricao?: string;
-  tipo?: string;
-  url?: string;
   categoriaId?: string;
   projetoId?: string;
   clienteId?: string;
-  versao?: string;
-  observacoes?: string;
   storageKey?: string;
   contentType?: string;
   sizeBytes?: number;

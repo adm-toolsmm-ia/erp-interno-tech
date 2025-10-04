@@ -99,7 +99,7 @@ export default function DocumentosPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Título</TableHead>
-                    <TableHead>Tipo</TableHead>
+                    <TableHead>Tipo de Arquivo</TableHead>
                     <TableHead>Projeto</TableHead>
                     <TableHead>Categoria</TableHead>
                     <TableHead>Versão</TableHead>
@@ -118,7 +118,7 @@ export default function DocumentosPage() {
                         {documento.titulo}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{documento.tipo || '-'}</Badge>
+                        <Badge variant="secondary">{documento.contentType || '-'}</Badge>
                       </TableCell>
                       <TableCell>
                         {documento.projeto?.assunto || '-'}
@@ -127,7 +127,7 @@ export default function DocumentosPage() {
                         {documento.categoria?.nome || '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{documento.versao || '-'}</Badge>
+                        <Badge variant="outline">{documento.currentVersion || '1.0'}</Badge>
                       </TableCell>
                       <TableCell>
                         {new Date(documento.createdAt).toLocaleDateString('pt-BR')}

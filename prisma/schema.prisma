@@ -426,10 +426,6 @@ model Documento {
 
   titulo         String
   descricao      String?
-  tipo           String?
-  url            String?
-  versao         String?
-  observacoes    String?
   currentVersion Int      @default(1)
   tags           String[]
 

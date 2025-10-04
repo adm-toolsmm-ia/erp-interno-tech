@@ -20,11 +20,11 @@ export function CreateDocumentoModal({ isOpen, onClose, onSuccess }: CreateDocum
   const [formData, setFormData] = useState({
     titulo: '',
     descricao: '',
-    tipo: 'DOCUMENTO' as 'DOCUMENTO' | 'CONTRATO' | 'PROPOSTA' | 'RELATORIO' | 'OUTRO',
     categoriaId: '',
     projetoId: '',
-    versao: '1.0',
-    observacoes: '',
+    storageKey: '',
+    contentType: '',
+    sizeBytes: 0,
   });
 
   const { post, loading, error } = useCreateDocumento();
@@ -52,11 +52,11 @@ export function CreateDocumentoModal({ isOpen, onClose, onSuccess }: CreateDocum
       setFormData({
         titulo: '',
         descricao: '',
-        tipo: 'DOCUMENTO',
         categoriaId: '',
         projetoId: '',
-        versao: '1.0',
-        observacoes: '',
+        storageKey: '',
+        contentType: '',
+        sizeBytes: 0,
       });
     }
   };
@@ -64,133 +64,145 @@ export function CreateDocumentoModal({ isOpen, onClose, onSuccess }: CreateDocum
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [e.target.name]: e.target.type === 'number' ? Number(e.target.value) : e.target.value
     }));
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Novo Documento" size="lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <div className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Novo Documento</h2>
+        
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-red-800 text-sm">{error.error.message}</p>
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
           </div>
         )}
 
-        <div>
-          <Label htmlFor="titulo">Título *</Label>
-          <Input
-            id="titulo"
-            name="titulo"
-            value={formData.titulo}
-            onChange={handleChange}
-            required
-            placeholder="Título do documento"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="descricao">Descrição</Label>
-          <textarea
-            id="descricao"
-            name="descricao"
-            value={formData.descricao}
-            onChange={handleChange}
-            rows={3}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder="Descrição do documento"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="tipo">Tipo *</Label>
-            <select
-              id="tipo"
-              name="tipo"
-              value={formData.tipo}
+            <Label htmlFor="titulo">Título *</Label>
+            <Input
+              id="titulo"
+              name="titulo"
+              value={formData.titulo}
               onChange={handleChange}
               required
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="DOCUMENTO">Documento</option>
-              <option value="CONTRATO">Contrato</option>
-              <option value="PROPOSTA">Proposta</option>
-              <option value="RELATORIO">Relatório</option>
-              <option value="OUTRO">Outro</option>
-            </select>
-          </div>
-
-          <div>
-            <Label htmlFor="categoriaId">Categoria</Label>
-            <select
-              id="categoriaId"
-              name="categoriaId"
-              value={formData.categoriaId}
-              onChange={handleChange}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">Selecione uma categoria</option>
-              {categorias?.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>
-                  {categoria.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <Label htmlFor="projetoId">Projeto</Label>
-            <select
-              id="projetoId"
-              name="projetoId"
-              value={formData.projetoId}
-              onChange={handleChange}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">Selecione um projeto</option>
-              {projetos?.map((projeto) => (
-                <option key={projeto.id} value={projeto.id}>
-                  {projeto.assunto}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <Label htmlFor="versao">Versão</Label>
-            <Input
-              id="versao"
-              name="versao"
-              value={formData.versao}
-              onChange={handleChange}
-              placeholder="1.0"
+              placeholder="Título do documento"
             />
           </div>
-        </div>
 
-        <div>
-          <Label htmlFor="observacoes">Observações</Label>
-          <textarea
-            id="observacoes"
-            name="observacoes"
-            value={formData.observacoes}
-            onChange={handleChange}
-            rows={3}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder="Observações adicionais"
-          />
-        </div>
+          <div>
+            <Label htmlFor="descricao">Descrição</Label>
+            <textarea
+              id="descricao"
+              name="descricao"
+              value={formData.descricao}
+              onChange={handleChange}
+              rows={3}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="Descrição do documento"
+            />
+          </div>
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar'}
-          </Button>
-        </div>
-      </form>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="categoriaId">Categoria</Label>
+              <select
+                id="categoriaId"
+                name="categoriaId"
+                value={formData.categoriaId}
+                onChange={handleChange}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Selecione uma categoria</option>
+                {categorias?.map((categoria) => (
+                  <option key={categoria.id} value={categoria.id}>
+                    {categoria.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="projetoId">Projeto</Label>
+              <select
+                id="projetoId"
+                name="projetoId"
+                value={formData.projetoId}
+                onChange={handleChange}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Selecione um projeto</option>
+                {projetos?.map((projeto) => (
+                  <option key={projeto.id} value={projeto.id}>
+                    {projeto.assunto}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="storageKey">Storage Key *</Label>
+              <Input
+                id="storageKey"
+                name="storageKey"
+                value={formData.storageKey}
+                onChange={handleChange}
+                required
+                placeholder="documentos/projeto-123/doc.pdf"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="contentType">Content Type *</Label>
+              <select
+                id="contentType"
+                name="contentType"
+                value={formData.contentType}
+                onChange={handleChange}
+                required
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Selecione o tipo</option>
+                <option value="application/pdf">PDF</option>
+                <option value="application/msword">Word</option>
+                <option value="application/vnd.openxmlformats-officedocument.wordprocessingml.document">Word (DOCX)</option>
+                <option value="application/vnd.ms-excel">Excel</option>
+                <option value="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">Excel (XLSX)</option>
+                <option value="text/plain">Texto</option>
+                <option value="image/jpeg">JPEG</option>
+                <option value="image/png">PNG</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="sizeBytes">Tamanho (bytes) *</Label>
+            <Input
+              id="sizeBytes"
+              name="sizeBytes"
+              type="number"
+              value={formData.sizeBytes}
+              onChange={handleChange}
+              required
+              min="1"
+              placeholder="1024000"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Criando...' : 'Criar Documento'}
+            </Button>
+          </div>
+        </form>
+      </div>
     </Modal>
   );
 }
