@@ -4,16 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma generate && next build --turbopack",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "type-check": "tsc --noEmit",
-    "lint:fix": "eslint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "test:coverage": "jest --coverage --watchAll=false",
+    "test:watch": "jest --watch",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
     "audit:ci": "npm audit --audit-level moderate",
@@ -22,7 +23,11 @@
     "test:e2e": "playwright test || cypress run",
     "check:all": "npm run validate:routes && npm run check:onclick && npm run test:e2e",
     "quality": "npm run type-check && npm run lint && npm run format:check && npm run test:coverage",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "deploy:preview": "vercel --target preview",
+    "deploy:production": "vercel --target production",
+    "vercel:build": "prisma generate && next build",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",

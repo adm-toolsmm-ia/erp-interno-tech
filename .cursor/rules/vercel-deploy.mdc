@@ -1,0 +1,200 @@
+---
+alwaysApply: true
+description: "Regras para deploy seguro no Vercel - ERP Interno Tech"
+---
+
+# 🚀 Vercel Deploy Rules - ERP Interno Tech
+
+## Configuração Obrigatória
+
+### vercel.json
+```json
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "installCommand": "npm ci",
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "regions": ["gru1"],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Scripts Package.json Obrigatórios
+```json
+{
+  "scripts": {
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
+    "vercel:build": "prisma generate && next build",
+    "deploy:preview": "vercel --target preview",
+    "deploy:production": "vercel --target production"
+  }
+}
+```
+
+## Pipeline CI/CD Obrigatório
+
+### GitHub Actions
+- **SEMPRE** usar GitHub Actions para deploy
+- **NUNCA** fazer deploy direto do Vercel CLI
+- **SEMPRE** configurar branch protection rules
+- **SEMPRE** executar quality checks antes do deploy
+
+### Secrets Obrigatórios
+```bash
+# Configurar no GitHub Secrets
+VERCEL_TOKEN=your_vercel_token
+VERCEL_ORG_ID=your_org_id
+VERCEL_PROJECT_ID=your_project_id
+```
+
+## Configuração Next.js
+
+### next.config.ts
+```typescript
+const nextConfig: NextConfig = {
+  output: 'standalone',
+  compress: true,
+  poweredByHeader: false,
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-slot'],
+  },
+  // Headers de segurança obrigatórios
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+        ],
+      },
+    ];
+  },
+};
+```
+
+## Variáveis de Ambiente
+
+### Obrigatórias para Deploy
+```bash
+# Database
+DATABASE_URL=postgresql://...
+
+# Supabase
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Security
+INTERNAL_API_KEY=your_internal_api_key
+ALLOWED_ORIGINS=https://yourdomain.com
+
+# Application
+NODE_ENV=production
+SERVICE_VERSION=1.0.0
+```
+
+## Health Check Obrigatório
+
+### app/api/health/route.ts
+```typescript
+export async function GET() {
+  return Response.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.SERVICE_VERSION || '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
+  });
+}
+```
+
+## Checklist de Deploy
+
+### Antes de Deploy
+- [ ] **Pipeline CI/CD** configurado
+- [ ] **Secrets** configurados no GitHub
+- [ ] **Variáveis de ambiente** configuradas no Vercel
+- [ ] **Health check** funcionando
+- [ ] **Quality checks** passando
+
+### Durante Deploy
+- [ ] **Build** executando sem erros
+- [ ] **Prisma generate** executando
+- [ ] **Type check** passando
+- [ ] **Lint** passando
+- [ ] **Tests** passando
+
+### Após Deploy
+- [ ] **Health check** respondendo
+- [ ] **APIs** funcionando
+- [ ] **Frontend** carregando
+- [ ] **Logs** sendo gerados
+- [ ] **Monitoramento** ativo
+
+## Anti-Padrões
+
+### ❌ NÃO Fazer
+- Deploy direto do Vercel CLI sem CI/CD
+- Commitar secrets no código
+- Usar `--turbopack` em produção
+- Pular quality checks
+- Deploy sem health check
+- Configurar CORS como `*` em produção
+
+### ✅ Fazer
+- Sempre usar GitHub Actions
+- Configurar secrets no GitHub
+- Usar `npm ci` para instalação
+- Executar todos os quality checks
+- Implementar health check
+- Configurar CORS específico
+
+## Troubleshooting
+
+### Build Failures
+1. Verificar se `prisma generate` está executando
+2. Verificar se todas as dependências estão instaladas
+3. Verificar se TypeScript está compilando
+4. Verificar se ESLint está passando
+
+### Runtime Failures
+1. Verificar variáveis de ambiente
+2. Verificar conexão com banco de dados
+3. Verificar logs do Vercel
+4. Verificar health check
+
+### Performance Issues
+1. Verificar bundle size
+2. Verificar otimizações do Next.js
+3. Verificar configurações de cache
+4. Verificar região do Vercel

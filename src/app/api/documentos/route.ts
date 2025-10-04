@@ -210,7 +210,6 @@ export async function POST(request: NextRequest) {
         sizeBytes: validatedData.sizeBytes,
         checksum: validatedData.checksum || null,
         storageProvider: validatedData.storageProvider || null,
-        metadata: validatedData.metadata || undefined,
         tags: validatedData.tags || [],
         empresaId: context.empresaId,
         createdById: context.userId, // TODO: Implementar autenticação
