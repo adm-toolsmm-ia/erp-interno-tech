@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Otimizações para produção
-  output: 'standalone',
   
   // Configurações de performance
   compress: true,
