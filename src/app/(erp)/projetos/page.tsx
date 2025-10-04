@@ -173,13 +173,13 @@ export default function ProjetosPage() {
                           {projeto.assunto}
                         </TableCell>
                         <TableCell>
-                          {projeto.cliente.razaoSocial}
+                          {projeto.cliente?.razaoSocial || '-'}
                         </TableCell>
                         <TableCell>
                           {projeto.status ? (
                             <Badge 
                               variant="secondary"
-                              style={{ backgroundColor: projeto.status.cor }}
+                              style={{ backgroundColor: projeto.status.cor || '#6B7280' }}
                             >
                               {projeto.status.nome}
                             </Badge>
@@ -194,10 +194,10 @@ export default function ProjetosPage() {
                           {new Date(projeto.dataEntrada).toLocaleDateString('pt-BR')}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{projeto._count.documentos}</Badge>
+                          <Badge variant="outline">{projeto._count?.documentos || 0}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{projeto._count.orcamentos}</Badge>
+                          <Badge variant="outline">{projeto._count?.orcamentos || 0}</Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">

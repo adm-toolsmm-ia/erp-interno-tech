@@ -118,7 +118,7 @@ export default function DocumentosPage() {
                         {documento.titulo}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{documento.tipo}</Badge>
+                        <Badge variant="secondary">{documento.tipo || '-'}</Badge>
                       </TableCell>
                       <TableCell>
                         {documento.projeto?.assunto || '-'}
@@ -127,7 +127,7 @@ export default function DocumentosPage() {
                         {documento.categoria?.nome || '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{documento.versao}</Badge>
+                        <Badge variant="outline">{documento.versao || '-'}</Badge>
                       </TableCell>
                       <TableCell>
                         {new Date(documento.createdAt).toLocaleDateString('pt-BR')}

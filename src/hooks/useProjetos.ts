@@ -23,6 +23,13 @@ export interface Projeto {
   status?: {
     nome: string;
     fase?: string;
+    cor?: string;
+  };
+  _count?: {
+    documentos: number;
+    orcamentos: number;
+    atividades: number;
+    atas: number;
   };
 }
 

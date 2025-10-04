@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const validationErrors = error.errors.reduce((acc: Record<string, string[]>, err) => {
+      const validationErrors = error.issues.reduce((acc: Record<string, string[]>, err) => {
         const field = err.path.join('.');
         if (!acc[field]) acc[field] = [];
         acc[field].push(err.message);

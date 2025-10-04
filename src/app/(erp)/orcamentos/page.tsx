@@ -132,9 +132,9 @@ export default function OrcamentosPage() {
                         {orcamento.projeto?.assunto || '-'}
                       </TableCell>
                       <TableCell>
-                        {orcamento.valor ? (
+                        {orcamento.valorTotal ? (
                           <span className="font-medium text-green-600">
-                            {orcamento.moeda} {orcamento.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {orcamento.moeda} {orcamento.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         ) : '-'}
                       </TableCell>
