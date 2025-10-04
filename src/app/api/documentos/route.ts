@@ -200,7 +200,18 @@ export async function POST(request: NextRequest) {
     // Criar documento
     const documento = await prisma.documento.create({
       data: {
-        ...validatedData,
+        titulo: validatedData.titulo,
+        descricao: validatedData.descricao,
+        categoriaId: validatedData.categoriaId || null,
+        projetoId: validatedData.projetoId || null,
+        clienteId: validatedData.clienteId || null,
+        storageKey: validatedData.storageKey,
+        contentType: validatedData.contentType,
+        sizeBytes: validatedData.sizeBytes,
+        checksum: validatedData.checksum || null,
+        storageProvider: validatedData.storageProvider || null,
+        metadata: validatedData.metadata || null,
+        tags: validatedData.tags || [],
         empresaId: context.empresaId,
         createdById: context.userId, // TODO: Implementar autenticação
       },
