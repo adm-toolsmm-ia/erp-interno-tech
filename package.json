@@ -20,6 +20,7 @@
     "audit:ci": "npm audit --audit-level moderate",
     "validate:routes": "tsx scripts/validate-routes.ts",
     "check:onclick": "tsx scripts/no-empty-onclick.ts",
+    "validate:deploy": "tsx scripts/validate-deploy-config.ts",
     "test:e2e": "playwright test || cypress run",
     "check:all": "npm run validate:routes && npm run check:onclick && npm run test:e2e",
     "quality": "npm run type-check && npm run lint && npm run format:check && npm run test:coverage",
