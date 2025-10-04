@@ -55,7 +55,7 @@
 * **Upload**: ≤50MB; formatos: PDF, DOCX, XLSX, PNG, JPG.
 * **Versionamento**: `Documento` (metadados) + `DocumentoVersao` (conteúdo imutável).
 * **Rollback**: reversão permitida.
-* **IA**: embeddings para busca semântica.
+* **IA**: busca semântica (Fase 2).
 
 ### 1.4.5 Orçamento
 
@@ -107,7 +107,7 @@
 Scope: multi-tenant, multi-client, multi-project.
 Must haves: dashboards, docs with versioning+rollback, budgets with totals, schedules with dependencies, meetings versions.
 NFR: RLS, Decimal money, p95<500ms, uploads ≤50MB, WCAG AA, observability.
-Data: tenant key `empresaId`, audit fields, seeds for lookups, embeddings for semantic search.
+Data: tenant key `empresaId`, audit fields, seeds for lookups, busca semântica (Fase 2).
 
 ---
 
@@ -488,7 +488,7 @@ model Documento {
   cliente         Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
 
   versoes         DocumentoVersao[]
-  embeddings      DocumentoEmbedding[]
+  // embeddings      DocumentoEmbedding[] // Fase 2
 
   @@index([empresaId, projetoId])
   @@index([empresaId, clienteId])
@@ -519,19 +519,19 @@ model DocumentoVersao {
 }
 
 // Requer extensão pgvector e índice vetorial (migration SQL)
-model DocumentoEmbedding {
-  id            String   @id @default(uuid())
-  documentoId   String
-  versaoId      String?
-  embedding     Unsupported("vector(1536)")
-  provider      String?
-  dims          Int      @default(1536)
-
-  documento     Documento        @relation(fields: [documentoId], references: [id], onDelete: Cascade)
-  versao        DocumentoVersao? @relation(fields: [versaoId], references: [id], onDelete: SetNull)
-
-  @@index([documentoId])
-}
+// model DocumentoEmbedding {
+//   id            String   @id @default(uuid())
+//   documentoId   String
+//   versaoId      String?
+//   embedding     Unsupported("vector(1536)")
+//   provider      String?
+//   dims          Int      @default(1536)
+//
+//   documento     Documento        @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+//   versao        DocumentoVersao? @relation(fields: [versaoId], references: [id], onDelete: SetNull)
+//
+//   @@index([documentoId])
+// }
 
 // ===========================
 // Lookups (seeds via UI)

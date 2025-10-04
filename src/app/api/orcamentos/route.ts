@@ -7,6 +7,9 @@ import { createOrcamentoSchema, updateOrcamentoSchema, paginationSchema, orcamen
 import { AppError, handleError } from '@/lib/errors';
 import { logInfo, logError } from '@/lib/logger';
 
+// Configurar runtime para Node.js (necessário para Prisma)
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest) {
   const context = extractTenantFromRequest(request);
   

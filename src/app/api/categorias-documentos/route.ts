@@ -7,6 +7,9 @@ import { paginationSchema } from '@/lib/validations';
 import { AppError, handleError } from '@/lib/errors';
 import { logInfo, logError } from '@/lib/logger';
 
+// Configurar runtime para Node.js (necessário para Prisma)
+export const runtime = 'nodejs';
+
 // Schema para Categoria de Documento
 const createCategoriaDocumentoSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),

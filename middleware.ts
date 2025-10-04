@@ -61,7 +61,20 @@ export function middleware(request: NextRequest) {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   
   // CORS para APIs internas
-  response.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGINS || '*');
+  const allowedOrigins = process.env.ALLOWED_ORIGINS;
+  
+  // Em produção, ALLOWED_ORIGINS deve estar configurado
+  if (process.env.NODE_ENV === 'production' && !allowedOrigins) {
+    return NextResponse.json(
+      { 
+        error: 'Configuração de segurança inválida', 
+        message: 'ALLOWED_ORIGINS deve estar configurado em produção' 
+      }, 
+      { status: 500 }
+    );
+  }
+  
+  response.headers.set('Access-Control-Allow-Origin', allowedOrigins || '*');
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-internal-key, x-tenant-id');
 

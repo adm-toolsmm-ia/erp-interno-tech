@@ -5,6 +5,9 @@ import { createSuccessResponse, createErrorResponse } from '@/lib/api-response';
 import { handleError } from '@/lib/errors';
 import { logInfo, logError } from '@/lib/logger';
 
+// Configurar runtime para Node.js (necessário para Prisma)
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest) {
   const context = extractTenantFromRequest(request);
   

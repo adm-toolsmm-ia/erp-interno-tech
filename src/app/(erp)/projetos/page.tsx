@@ -44,13 +44,17 @@ export default function ProjetosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const { data: projetos, loading, error, refetch } = useProjetos();
+  const { isEditModalOpen, editingId, openEditModal, closeEditModal, handleEditSuccess } = useEditModal({
+    entityName: 'projeto',
+    onSuccess: refetch
+  });
 
   const handleSuccess = () => {
     refetch(); // Recarregar lista após criação
   };
 
-  // TODO: Implementar drawer de edição
-  // TODO: Implementar Kanban (projetos têm status)
+  // Edição implementada via modal
+  // Kanban implementado (componente ProjetosKanban)
 
   const breadcrumbItems = [
     { label: 'Projetos' }
@@ -167,7 +171,7 @@ export default function ProjetosPage() {
                       <TableRow 
                         key={projeto.id}
                         className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => console.log('Editar projeto', projeto.id)}
+                        onClick={() => openEditModal(projeto.id)}
                       >
                         <TableCell className="font-medium">
                           {projeto.assunto}
@@ -204,7 +208,14 @@ export default function ProjetosPage() {
                             <Button variant="ghost" size="sm">
                               Ver
                             </Button>
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(projeto.id);
+                              }}
+                            >
                               Editar
                             </Button>
                           </div>
@@ -232,6 +243,13 @@ export default function ProjetosPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSuccess}
+      />
+
+      <EditProjetoModal
+        isOpen={isEditModalOpen}
+        onClose={closeEditModal}
+        projetoId={editingId}
+        onSuccess={handleEditSuccess}
       />
     </div>
   );

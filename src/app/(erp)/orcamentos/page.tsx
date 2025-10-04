@@ -11,12 +11,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Search, Filter } from 'lucide-react';
 import { CreateOrcamentoModal } from '@/components/forms/CreateOrcamentoModal';
 import { useOrcamentos } from '@/hooks/useOrcamentos';
+import { useToast } from '@/hooks/useToast';
+import { ToastContainer } from '@/components/ui/toast';
 
 export default function OrcamentosPage() {
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const { data: orcamentos, loading, error, refetch } = useOrcamentos();
+  const { toasts, showInfo, removeToast } = useToast();
 
   const handleSuccess = () => {
     refetch(); // Recarregar lista após criação
@@ -123,7 +126,7 @@ export default function OrcamentosPage() {
                     <TableRow 
                       key={orcamento.id}
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => console.log('Editar orçamento', orcamento.id)}
+                      onClick={() => showInfo('Funcionalidade de edição será implementada em breve')}
                     >
                       <TableCell className="font-medium">
                         {orcamento.titulo}
@@ -154,9 +157,16 @@ export default function OrcamentosPage() {
                           <Button variant="ghost" size="sm">
                             Ver
                           </Button>
-                          <Button variant="ghost" size="sm">
-                            Editar
-                          </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showInfo('Funcionalidade de edição será implementada em breve');
+                              }}
+                            >
+                              Editar
+                            </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -173,6 +183,8 @@ export default function OrcamentosPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSuccess}
       />
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

@@ -11,12 +11,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Search, Filter } from 'lucide-react';
 import { CreateStatusProjetoModal } from '@/components/forms/CreateStatusProjetoModal';
 import { useStatusProjetos } from '@/hooks/useStatusProjetos';
+import { useToast } from '@/hooks/useToast';
+import { ToastContainer } from '@/components/ui/toast';
 
 export default function StatusProjetosPage() {
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const { data: statusProjetos, loading, error, refetch } = useStatusProjetos();
+  const { toasts, showInfo, removeToast } = useToast();
 
   const handleSuccess = () => {
     refetch(); // Recarregar lista após criação
@@ -123,7 +126,7 @@ export default function StatusProjetosPage() {
                     <TableRow 
                       key={status.id}
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => console.log('Editar status', status.id)}
+                      onClick={() => showInfo('Funcionalidade de edição será implementada em breve')}
                     >
                       <TableCell className="font-medium">
                         {status.nome}
@@ -152,9 +155,16 @@ export default function StatusProjetosPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm">
-                            Editar
-                          </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showInfo('Funcionalidade de edição será implementada em breve');
+                              }}
+                            >
+                              Editar
+                            </Button>
                           <Button variant="ghost" size="sm" className="text-red-600">
                             Excluir
                           </Button>
@@ -174,6 +184,8 @@ export default function StatusProjetosPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSuccess}
       />
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

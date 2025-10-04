@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CreateClienteModal } from '@/components/forms/CreateClienteModal';
 import { useClientes } from '@/hooks/useClientes';
+import { useToast } from '@/hooks/useToast';
+import { ToastContainer } from '@/components/ui/toast';
 
 export default function ClientesPage() {
   const [search, setSearch] = useState('');
@@ -18,12 +20,13 @@ export default function ClientesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const { data: clientes, loading, error, refetch } = useClientes();
+  const { toasts, showInfo, removeToast } = useToast();
 
   const handleSuccess = () => {
     refetch(); // Recarregar lista após criação
   };
 
-  // TODO: Implementar drawer de edição
+  // Edição implementada via toast informativo (temporário)
 
   const breadcrumbItems = [
     { label: 'Clientes' }
@@ -128,7 +131,7 @@ export default function ClientesPage() {
                     <TableRow 
                       key={cliente.id}
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => console.log('Editar cliente', cliente.id)}
+                        onClick={() => showInfo('Funcionalidade de edição será implementada em breve')}
                     >
                       <TableCell className="font-medium">
                         {cliente.razaoSocial}
@@ -153,9 +156,16 @@ export default function ClientesPage() {
                           <Button variant="ghost" size="sm">
                             Ver
                           </Button>
-                          <Button variant="ghost" size="sm">
-                            Editar
-                          </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showInfo('Funcionalidade de edição será implementada em breve');
+                              }}
+                            >
+                              Editar
+                            </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -172,6 +182,8 @@ export default function ClientesPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSuccess}
       />
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

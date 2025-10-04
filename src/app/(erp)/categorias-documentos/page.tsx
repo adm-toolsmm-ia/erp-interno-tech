@@ -11,12 +11,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Search, Filter } from 'lucide-react';
 import { CreateCategoriaDocumentoModal } from '@/components/forms/CreateCategoriaDocumentoModal';
 import { useCategoriasDocumentos } from '@/hooks/useCategoriasDocumentos';
+import { useToast } from '@/hooks/useToast';
+import { ToastContainer } from '@/components/ui/toast';
 
 export default function CategoriasDocumentosPage() {
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const { data: categorias, loading, error, refetch } = useCategoriasDocumentos();
+  const { toasts, showInfo, removeToast } = useToast();
 
   const handleSuccess = () => {
     refetch(); // Recarregar lista após criação
@@ -112,7 +115,7 @@ export default function CategoriasDocumentosPage() {
                     <TableRow 
                       key={categoria.id}
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => console.log('Editar categoria', categoria.id)}
+                      onClick={() => showInfo('Funcionalidade de edição será implementada em breve')}
                     >
                       <TableCell className="font-medium">
                         {categoria.nome}
@@ -139,9 +142,16 @@ export default function CategoriasDocumentosPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm">
-                            Editar
-                          </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showInfo('Funcionalidade de edição será implementada em breve');
+                              }}
+                            >
+                              Editar
+                            </Button>
                           <Button variant="ghost" size="sm" className="text-red-600">
                             Excluir
                           </Button>
@@ -161,6 +171,8 @@ export default function CategoriasDocumentosPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSuccess}
       />
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

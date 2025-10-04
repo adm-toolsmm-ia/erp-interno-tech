@@ -11,12 +11,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Search, Filter } from 'lucide-react';
 import { CreateDocumentoModal } from '@/components/forms/CreateDocumentoModal';
 import { useDocumentos } from '@/hooks/useDocumentos';
+import { useToast } from '@/hooks/useToast';
+import { ToastContainer } from '@/components/ui/toast';
 
 export default function DocumentosPage() {
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const { data: documentos, loading, error, refetch } = useDocumentos();
+  const { toasts, showInfo, removeToast } = useToast();
 
   const handleSuccess = () => {
     refetch(); // Recarregar lista após criação
@@ -112,7 +115,7 @@ export default function DocumentosPage() {
                     <TableRow 
                       key={documento.id}
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => console.log('Editar documento', documento.id)}
+                        onClick={() => showInfo('Funcionalidade de edição será implementada em breve')}
                     >
                       <TableCell className="font-medium">
                         {documento.titulo}
@@ -137,9 +140,16 @@ export default function DocumentosPage() {
                           <Button variant="ghost" size="sm">
                             Ver
                           </Button>
-                          <Button variant="ghost" size="sm">
-                            Editar
-                          </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                showInfo('Funcionalidade de edição será implementada em breve');
+                              }}
+                            >
+                              Editar
+                            </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -156,6 +166,8 @@ export default function DocumentosPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleSuccess}
       />
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }
